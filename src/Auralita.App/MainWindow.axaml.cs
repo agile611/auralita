@@ -44,7 +44,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         QueueList.ItemsSource = _entries;
-        _playbackTimer.Interval = TimeSpan.FromMilliseconds(250);
+        _playbackTimer.Interval = TimeSpan.FromMilliseconds(500);
         _playbackTimer.Tick += OnPlaybackTimerTick;
         Closed += OnWindowClosed;
         Opened += OnWindowOpened;
@@ -273,6 +273,11 @@ public partial class MainWindow : Window
             NowPlayingText.Text = entry.Track.Title;
             NowPlayingDetailsText.Text = $"{entry.Track.Artist}  ·  {entry.Track.Album}";
             NowPlayingArtwork.Source = _entryViewModels.GetValueOrDefault(entry.Id)?.Artwork;
+            if (_entryViewModels.TryGetValue(entry.Id, out var activeViewModel))
+            {
+                LoadArtwork(activeViewModel);
+            }
+
             StatusText.Text = $"Playing {entry.Track.Title}.";
             _playbackTimer.Start();
             UpdatePlaybackProgress();
@@ -301,7 +306,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        RefreshQueue();
+        if (_queue.Snapshot.CurrentEntryId is { } entryId)
+        {
+            SelectQueueEntry(entryId);
+        }
+
         if (QueueList.SelectedItem is QueueTrackViewModel selected)
         {
             PlayTrack(selected.Entry);
@@ -370,6 +379,7 @@ public partial class MainWindow : Window
         if (QueueList.SelectedItem is QueueTrackViewModel selected)
         {
             _queue.TrySelect(selected.Entry.Id);
+            LoadArtwork(selected);
         }
 
         UpdatePlaybackControls();
@@ -419,7 +429,6 @@ public partial class MainWindow : Window
 
             _entryViewModels[entry.Id] = viewModel;
             _entries.Add(viewModel);
-            LoadArtwork(viewModel);
         }
 
         foreach (var entryId in _entryViewModels.Keys
@@ -431,6 +440,24 @@ public partial class MainWindow : Window
 
         QueueList.SelectedItem = _entries
             .FirstOrDefault(entry => entry.Entry.Id == snapshot.CurrentEntryId);
+        if (QueueList.SelectedItem is QueueTrackViewModel selectedViewModel)
+        {
+            LoadArtwork(selectedViewModel);
+        }
+
+        UpdateQueueChrome();
+        UpdatePlaybackControls();
+    }
+
+    private void SelectQueueEntry(Guid entryId)
+    {
+        _queue.TrySelect(entryId);
+        QueueList.SelectedItem = _entryViewModels.GetValueOrDefault(entryId);
+        if (QueueList.SelectedItem is QueueTrackViewModel selectedViewModel)
+        {
+            LoadArtwork(selectedViewModel);
+        }
+
         UpdateQueueChrome();
         UpdatePlaybackControls();
     }
@@ -468,7 +495,11 @@ public partial class MainWindow : Window
 
         if (_queue.TrySelectNext())
         {
-            RefreshQueue();
+            if (_queue.Snapshot.CurrentEntryId is { } entryId)
+            {
+                SelectQueueEntry(entryId);
+            }
+
             if (QueueList.SelectedItem is QueueTrackViewModel nextTrack)
             {
                 PlayTrack(nextTrack.Entry);

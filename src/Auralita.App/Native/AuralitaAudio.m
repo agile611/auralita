@@ -100,6 +100,9 @@ int32_t auralita_play_url(const char *mediaUrl)
             host.player = nil;
             [host.streamPlayer pause];
             host.streamPlayer = [AVPlayer playerWithURL:url];
+            if ([host.streamPlayer respondsToSelector:@selector(setAutomaticallyWaitsToMinimizeStalling:)]) {
+                [host.streamPlayer setValue:@NO forKey:@"automaticallyWaitsToMinimizeStalling"];
+            }
             [host.streamPlayer play];
         }
 

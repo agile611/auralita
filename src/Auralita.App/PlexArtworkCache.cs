@@ -9,6 +9,7 @@ internal sealed class PlexArtworkCache : IDisposable
     private const int MaxConcurrentDownloads = 4;
     private readonly ConcurrentDictionary<string, Lazy<Task<Bitmap?>>> _artwork = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _downloadSlots = new(MaxConcurrentDownloads);
+    private readonly CancellationTokenSource _disposeCancellation = new();
     private volatile bool _disposed;
 
     public Task<Bitmap?> GetAsync(
@@ -22,7 +23,7 @@ internal sealed class PlexArtworkCache : IDisposable
         return _artwork.GetOrAdd(
             artworkUri.AbsoluteUri,
             _ => new Lazy<Task<Bitmap?>>(
-                () => LoadAsync(client, artworkUri, cancellationToken),
+                () => LoadAsync(client, artworkUri, _disposeCancellation.Token),
                 LazyThreadSafetyMode.ExecutionAndPublication)).Value;
     }
 
@@ -34,6 +35,7 @@ internal sealed class PlexArtworkCache : IDisposable
         }
 
         _disposed = true;
+        _disposeCancellation.Cancel();
         foreach (var lazyTask in _artwork.Values)
         {
             if (!lazyTask.IsValueCreated)
@@ -47,6 +49,8 @@ internal sealed class PlexArtworkCache : IDisposable
                 task.Result?.Dispose();
             }
         }
+
+        _disposeCancellation.Dispose();
     }
 
     private async Task<Bitmap?> LoadAsync(
@@ -72,7 +76,8 @@ internal sealed class PlexArtworkCache : IDisposable
             exception is PlexConnectionException or
             HttpRequestException or
             IOException or
-            ArgumentException)
+            ArgumentException or
+            OperationCanceledException)
         {
             return null;
         }
