@@ -50,6 +50,7 @@ internal sealed class PlexConnectionDialog : Window
     private CancellationTokenSource? _operationCancellation;
     private string? _connectedToken;
     private bool _isBusy;
+    private bool _isSigningIn;
 
     public PlexConnectionDialog(
         PlexServerSettings? settings,
@@ -149,14 +150,15 @@ internal sealed class PlexConnectionDialog : Window
 
     private async Task SignInAsync()
     {
-        if (_isBusy)
+        if (_isSigningIn)
         {
             return;
         }
 
-        _operationCancellation?.Dispose();
+        _operationCancellation?.Cancel();
         _operationCancellation = new CancellationTokenSource();
         var cancellationToken = _operationCancellation.Token;
+        _isSigningIn = true;
         SetBusy(true, "Requesting a secure Plex sign-in code…");
         try
         {
@@ -172,6 +174,7 @@ internal sealed class PlexConnectionDialog : Window
                 pin,
                 cancellationToken: cancellationToken);
             _credentialStore.SetPlexToken(token);
+            _isSigningIn = false;
             SetBusy(false);
             await FindLibrariesWithTokenAsync(token, cancellationToken);
         }
@@ -197,6 +200,7 @@ internal sealed class PlexConnectionDialog : Window
         }
         finally
         {
+            _isSigningIn = false;
             SetBusy(false);
         }
     }
@@ -205,11 +209,6 @@ internal sealed class PlexConnectionDialog : Window
         string token,
         CancellationToken cancellationToken = default)
     {
-        if (_isBusy)
-        {
-            return;
-        }
-
         if (!cancellationToken.CanBeCanceled)
         {
             _operationCancellation?.Dispose();
@@ -252,6 +251,10 @@ internal sealed class PlexConnectionDialog : Window
         {
             _status.Text = exception.Message;
         }
+        catch (OperationCanceledException)
+        {
+            _status.Text = "Plex discovery was cancelled.";
+        }
         finally
         {
             SetBusy(false);
@@ -270,9 +273,9 @@ internal sealed class PlexConnectionDialog : Window
         }
 
         SetBusy(true, "Loading tracks…");
+        var cancellationToken = _operationCancellation?.Token ?? CancellationToken.None;
         try
         {
-            var cancellationToken = _operationCancellation?.Token ?? CancellationToken.None;
             var section = _sections[_libraries.SelectedIndex];
             var tracks = await _client.GetTracksAsync(section.Key, cancellationToken);
             var serverUrl = _client.ResolvedServerUri
@@ -293,6 +296,10 @@ internal sealed class PlexConnectionDialog : Window
         {
             _status.Text = exception.Message;
         }
+        catch (OperationCanceledException)
+        {
+            _status.Text = "Loading the Plex library was cancelled.";
+        }
         finally
         {
             SetBusy(false);
@@ -301,10 +308,10 @@ internal sealed class PlexConnectionDialog : Window
 
     private void SetBusy(bool busy, string? status = null)
     {
-        _isBusy = busy;
-        _signInButton.IsEnabled = !busy;
+        _isBusy = busy || _isSigningIn;
+        _signInButton.IsEnabled = !_isSigningIn;
         _loadButton.IsEnabled =
-            !busy &&
+            !_isBusy &&
             _sections.Count > 0 &&
             !string.IsNullOrWhiteSpace(_connectedToken);
         _cancelButton.IsEnabled = true;
