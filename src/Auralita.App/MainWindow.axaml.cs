@@ -246,6 +246,11 @@ public partial class MainWindow : Window
         _playbackTimer.Stop();
         _isPlaying = false;
         _isPaused = true;
+        if (_activeEntryId is { } pausedEntryId)
+        {
+            ReportPlexTimeline(pausedEntryId, "paused");
+        }
+
         StatusText.Text = "Playback paused.";
         UpdatePlaybackControls();
     }
@@ -261,6 +266,13 @@ public partial class MainWindow : Window
             }
             else
             {
+                if (_hasActiveTrack &&
+                    _activeEntryId is { } previousEntryId &&
+                    previousEntryId != entry.Id)
+                {
+                    ReportPlexTimeline(previousEntryId, "stopped");
+                }
+
                 _audioPlayer.Play(entry.Track);
                 _activeEntryId = entry.Id;
                 _activeTrackIsRemote = entry.Track.Source?.Scheme is "http" or "https";
@@ -270,6 +282,7 @@ public partial class MainWindow : Window
             _isPlaying = true;
             _isPaused = false;
             _hasActiveTrack = true;
+            ReportPlexTimeline(entry.Id, "playing");
             NowPlayingText.Text = entry.Track.Title;
             NowPlayingDetailsText.Text = $"{entry.Track.Artist}  ·  {entry.Track.Album}";
             NowPlayingArtwork.Source = _entryViewModels.GetValueOrDefault(entry.Id)?.Artwork;
@@ -319,6 +332,11 @@ public partial class MainWindow : Window
 
     private void OnStopClick(object? sender, RoutedEventArgs e)
     {
+        if (_activeEntryId is { } stoppedEntryId)
+        {
+            ReportPlexTimeline(stoppedEntryId, "stopped");
+        }
+
         _audioPlayer.Stop();
         _playbackTimer.Stop();
         _isPlaying = false;
@@ -659,6 +677,56 @@ public partial class MainWindow : Window
         {
             await Dispatcher.UIThread.InvokeAsync(
                 () => StatusText.Text = $"Could not load Plex artwork: {exception.Message}");
+        }
+    }
+
+    private void ReportPlexTimeline(Guid entryId, string state)
+    {
+        if (_plexClient is null ||
+            !_entryViewModels.TryGetValue(entryId, out var viewModel) ||
+            string.IsNullOrWhiteSpace(viewModel.Entry.Track.PlexRatingKey))
+        {
+            return;
+        }
+
+        var duration = viewModel.Entry.Track.Duration ?? _audioPlayer.Duration;
+        _ = ReportPlexTimelineAsync(
+            _plexClient,
+            viewModel.Entry.Track.PlexRatingKey,
+            state,
+            _audioPlayer.CurrentTime,
+            duration);
+    }
+
+    private async Task ReportPlexTimelineAsync(
+        PlexClient client,
+        string ratingKey,
+        string state,
+        TimeSpan position,
+        TimeSpan duration)
+    {
+        try
+        {
+            await client.ReportTimelineAsync(
+                ratingKey,
+                state,
+                position,
+                duration,
+                _windowCancellation.Token);
+        }
+        catch (PlexAuthenticationException exception)
+        {
+            var message = ClearPlexCredentials(exception);
+            await Dispatcher.UIThread.InvokeAsync(() => StatusText.Text = message);
+        }
+        catch (PlexConnectionException)
+        {
+        }
+        catch (OperationCanceledException) when (_windowCancellation.IsCancellationRequested)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
         }
     }
 

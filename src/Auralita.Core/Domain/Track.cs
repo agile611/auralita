@@ -8,7 +8,8 @@ public sealed record Track
         Uri? source = null,
         string? album = null,
         TimeSpan? duration = null,
-        Uri? artworkUri = null)
+        Uri? artworkUri = null,
+        string? plexRatingKey = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(artist);
@@ -24,6 +25,7 @@ public sealed record Track
         Album = string.IsNullOrWhiteSpace(album) ? "Unknown album" : album.Trim();
         Duration = duration;
         ArtworkUri = artworkUri;
+        PlexRatingKey = string.IsNullOrWhiteSpace(plexRatingKey) ? null : plexRatingKey.Trim();
     }
 
     public Guid Id { get; }
@@ -39,4 +41,6 @@ public sealed record Track
     public TimeSpan? Duration { get; }
 
     public Uri? ArtworkUri { get; }
+
+    public string? PlexRatingKey { get; }
 }

@@ -617,10 +617,42 @@ public sealed class PlexClient : IDisposable
             ?.Attribute("key");
         var streamKey = FirstNonEmpty(partKey, element.Attribute("key"));
         var streamUri = BuildAuthenticatedUri(server, serverToken, streamKey);
+        var ratingKey = FirstNonEmpty(element.Attribute("ratingKey"), element.Attribute("key"));
 
         return streamUri is null
             ? null
-            : new Track(title, artist, streamUri, album, duration, artworkUri);
+            : new Track(title, artist, streamUri, album, duration, artworkUri, ratingKey);
+    }
+
+    public async Task ReportTimelineAsync(
+        string ratingKey,
+        string state,
+        TimeSpan position,
+        TimeSpan? duration,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentException.ThrowIfNullOrWhiteSpace(ratingKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(state);
+        if (position < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(position));
+        }
+
+        var server = await ResolveServerAsync(cancellationToken).ConfigureAwait(false);
+        var token = _activeServerToken ?? _accountToken;
+        var query = new List<string>
+        {
+            $"key={Uri.EscapeDataString(ratingKey)}",
+            $"ratingKey={Uri.EscapeDataString(ratingKey)}",
+            $"state={Uri.EscapeDataString(state)}",
+            $"time={Math.Max(0, (long)position.TotalMilliseconds).ToString(CultureInfo.InvariantCulture)}",
+            $"duration={Math.Max(0, (long)(duration ?? TimeSpan.Zero).TotalMilliseconds).ToString(CultureInfo.InvariantCulture)}"
+        };
+        var timelineUri = new Uri(
+            $"{server.AbsoluteUri.TrimEnd('/')}/:/timeline?{string.Join("&", query)}");
+        using var request = CreateRequest(timelineUri, token);
+        using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
     private Uri? BuildAuthenticatedUri(Uri server, string serverToken, string? key)

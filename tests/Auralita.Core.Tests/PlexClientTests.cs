@@ -182,7 +182,7 @@ public sealed class PlexClientTests
             AssertPlexHeaders(request, "server-token");
             return XmlResponse("""
                 <MediaContainer>
-                  <Track title="Song" grandparentTitle="Artist" parentTitle="Album" duration="183000" thumb="/library/metadata/11/thumb/1">
+                  <Track ratingKey="99" key="/library/metadata/99" title="Song" grandparentTitle="Artist" parentTitle="Album" duration="183000" thumb="/library/metadata/11/thumb/1">
                     <Media><Part key="/library/parts/99/file?download=1" /></Media>
                   </Track>
                 </MediaContainer>
@@ -203,6 +203,35 @@ public sealed class PlexClientTests
         Assert.Equal(
             "https://plex.local:32400/library/parts/99/file?download=1&X-Plex-Token=server-token",
             track.Source!.AbsoluteUri);
+        Assert.Equal("99", track.PlexRatingKey);
+    }
+
+    [Fact]
+    public async Task ReportTimelineUsesResolvedServerTokenAndTimelineParameters()
+    {
+        var handler = new StubHandler((request, _) =>
+        {
+            Assert.Equal("/:/timeline", request.RequestUri!.AbsolutePath);
+            AssertPlexHeaders(request, "server-token");
+            var query = request.RequestUri!.Query;
+            Assert.Contains("key=123", query);
+            Assert.Contains("ratingKey=123", query);
+            Assert.Contains("state=playing", query);
+            Assert.Contains("time=5000", query);
+            Assert.Contains("duration=180000", query);
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        });
+        using var client = CreateClient(
+            "https://plex.local:32400",
+            handler,
+            includeDefaultLibrary: true);
+
+        _ = await client.GetMusicLibrariesAsync();
+        await client.ReportTimelineAsync(
+            "123",
+            "playing",
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromMinutes(3));
     }
 
     [Fact]
