@@ -2,7 +2,7 @@
     x:Class="Auralita.App.MainWindow"
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:core="clr-namespace:Auralita.Core.Domain;assembly=Auralita.Core"
+    xmlns:app="clr-namespace:Auralita.App"
     Title="Auralita"
     Width="920"
     Height="680"
@@ -26,6 +26,13 @@
           </NativeMenu>
         </NativeMenuItem.Menu>
       </NativeMenuItem>
+      <NativeMenuItem Header="_Plex">
+        <NativeMenuItem.Menu>
+          <NativeMenu>
+            <NativeMenuItem Header="Connect to Plex…" Click="OnMenuPlexClick" />
+          </NativeMenu>
+        </NativeMenuItem.Menu>
+      </NativeMenuItem>
       <NativeMenuItem Header="_Playback">
         <NativeMenuItem.Menu>
           <NativeMenu>
@@ -43,7 +50,7 @@
   </NativeMenu.Menu>
 
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="28" RowSpacing="20">
-    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto">
       <Viewbox Width="58" Height="58" Stretch="Uniform">
         <Canvas Width="64" Height="64">
           <Path
@@ -72,11 +79,17 @@
       </Viewbox>
       <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0" Spacing="2">
         <TextBlock FontSize="28" FontWeight="Bold" Text="AURALITA" />
-        <TextBlock Classes="mono" FontSize="11" Opacity="0.7" Text="CRYSTAL AUDIO DECK  /  LOCAL LIBRARY" />
+        <TextBlock Classes="mono" FontSize="11" Opacity="0.7" Text="CRYSTAL AUDIO DECK  /  LOCAL + PLEX" />
       </StackPanel>
       <Button
-          x:Name="AddTracksButton"
+          x:Name="PlexButton"
           Grid.Column="2"
+          VerticalAlignment="Center"
+          Content="PLEX LIBRARY"
+          Click="OnPlexClick" />
+      <Button
+          x:Name="AddTracksButton"
+          Grid.Column="3"
           Classes="accent"
           VerticalAlignment="Center"
           Content="OPEN FILES"
@@ -106,11 +119,42 @@
           BorderThickness="0"
           SelectionChanged="OnSelectionChanged">
         <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="core:QueueEntry">
-            <StackPanel Margin="12,10" Spacing="3">
-              <TextBlock FontWeight="SemiBold" Text="{Binding Track.Title}" />
-              <TextBlock Opacity="0.7" Text="{Binding Track.Artist}" />
-            </StackPanel>
+          <DataTemplate x:DataType="app:QueueTrackViewModel">
+            <Grid Margin="10,8" ColumnDefinitions="44,*,Auto" ColumnSpacing="10">
+              <Border
+                  Width="40"
+                  Height="40"
+                  Background="#25232B"
+                  BorderBrush="#514863"
+                  BorderThickness="1">
+                <Grid>
+                  <Viewbox Width="25" Height="25" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Canvas Width="64" Height="64">
+                      <Path Data="M 25,5 L 39,5 L 49,23 L 32,60 L 15,23 Z" Fill="#65459B" />
+                      <Path Data="M 25,5 L 32,23 L 15,23 Z" Fill="#B49ADA" />
+                      <Path Data="M 39,5 L 32,23 L 49,23 Z" Fill="#8B6ABD" />
+                      <Path Data="M 15,23 L 32,23 L 32,60 Z" Fill="#7756AA" />
+                      <Path Data="M 32,23 L 49,23 L 32,60 Z" Fill="#50367F" />
+                    </Canvas>
+                  </Viewbox>
+                  <Image Source="{Binding Artwork}" Stretch="UniformToFill" />
+                </Grid>
+              </Border>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                <TextBlock FontWeight="SemiBold" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <TextBlock Opacity="0.75" Text="{Binding Artist}" />
+                  <TextBlock Opacity="0.5" Text="·" />
+                  <TextBlock Opacity="0.75" Text="{Binding Album}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </StackPanel>
+              <TextBlock
+                  Grid.Column="2"
+                  Classes="mono"
+                  VerticalAlignment="Center"
+                  Opacity="0.7"
+                  Text="{Binding DurationText}" />
+            </Grid>
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
@@ -134,7 +178,7 @@
             MaxWidth="340"
             TextAlignment="Center"
             Opacity="0.7"
-            Text="Open music from your Mac to start listening. Your files stay where they are." />
+            Text="Open music from your Mac or connect to Plex to start listening." />
         <Button Classes="accent" Content="CHOOSE MUSIC" Click="OnAddTracksClick" />
       </StackPanel>
     </Grid>
@@ -142,11 +186,28 @@
     <Border Grid.Row="4" Background="#111111" BorderBrush="#5B5B5B" BorderThickness="1" CornerRadius="2" Padding="14">
       <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
         <Grid Grid.Row="0" ColumnDefinitions="Auto,*">
-          <Viewbox Width="22" Height="22" VerticalAlignment="Center" Stretch="Uniform">
-            <Path Data="M 0,0 L 18,11 L 0,22 Z" Fill="#B8EC60" />
-          </Viewbox>
-          <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="3">
+          <Border
+              Width="48"
+              Height="48"
+              Background="#25232B"
+              BorderBrush="#514863"
+              BorderThickness="1">
+            <Grid>
+              <Viewbox Width="30" Height="30" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Canvas Width="64" Height="64">
+                  <Path Data="M 25,5 L 39,5 L 49,23 L 32,60 L 15,23 Z" Fill="#65459B" />
+                  <Path Data="M 25,5 L 32,23 L 15,23 Z" Fill="#B49ADA" />
+                  <Path Data="M 39,5 L 32,23 L 49,23 Z" Fill="#8B6ABD" />
+                  <Path Data="M 15,23 L 32,23 L 32,60 Z" Fill="#7756AA" />
+                  <Path Data="M 32,23 L 49,23 L 32,60 Z" Fill="#50367F" />
+                </Canvas>
+              </Viewbox>
+              <Image x:Name="NowPlayingArtwork" Stretch="UniformToFill" />
+            </Grid>
+          </Border>
+          <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="3" VerticalAlignment="Center">
             <TextBlock x:Name="NowPlayingText" Classes="lcd" Text="-- NOTHING PLAYING --" />
+            <TextBlock x:Name="NowPlayingDetailsText" FontSize="12" Opacity="0.8" />
             <TextBlock x:Name="StatusText" Classes="mono" FontSize="11" Opacity="0.7" Text="Open files to begin." />
           </StackPanel>
         </Grid>
@@ -155,7 +216,9 @@
             Grid.Row="1"
             Height="10"
             Background="#303030"
-            ClipToBounds="True">
+            ClipToBounds="True"
+            Cursor="Hand"
+            PointerPressed="OnProgressPointerPressed">
           <Border
               x:Name="ProgressFill"
               HorizontalAlignment="Left"
@@ -177,6 +240,12 @@
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <Path Data="M 0,7 L 10,0 L 10,14 Z M 12,0 L 15,0 L 15,14 L 12,14 Z" Fill="#D4D4D4" />
                 <TextBlock Text="PREV" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="PauseButton" IsEnabled="False" MinWidth="88" Click="OnPauseClick">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Path Data="M 1,0 L 5,0 L 5,14 L 1,14 Z M 9,0 L 13,0 L 13,14 L 9,14 Z" Fill="#D4D4D4" />
+                <TextBlock Text="PAUSE" />
               </StackPanel>
             </Button>
             <Button x:Name="PlayButton" Classes="accent" IsEnabled="False" MinWidth="88" Click="OnPlayClick">

@@ -19,6 +19,37 @@
     <Style Selector="TextBlock.mono">
       <Setter Property="FontFamily" Value="Menlo" />
     </Style>
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="#141414" />
+      <Setter Property="Foreground" Value="#E0E0E0" />
+      <Setter Property="BorderBrush" Value="#666666" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CaretBrush" Value="#B8EC60" />
+      <Setter Property="SelectionBrush" Value="#536D32" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border
+              Name="PART_Border"
+              Background="{TemplateBinding Background}"
+              BorderBrush="{TemplateBinding BorderBrush}"
+              BorderThickness="{TemplateBinding BorderThickness}">
+            <ScrollViewer
+                Name="PART_ScrollViewer"
+                Background="Transparent"
+                Padding="{TemplateBinding Padding}"
+                HorizontalScrollBarVisibility="Hidden"
+                VerticalScrollBarVisibility="Hidden">
+              <TextPresenter
+                  Name="PART_TextPresenter"
+                  Text="{TemplateBinding Text}"
+                  PasswordChar="{TemplateBinding PasswordChar}"
+                  CaretBrush="{TemplateBinding CaretBrush}"
+                  SelectionBrush="{TemplateBinding SelectionBrush}" />
+            </ScrollViewer>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
     <Style Selector="Button">
       <Setter Property="Background" Value="#333333" />
       <Setter Property="Foreground" Value="#E0E0E0" />
