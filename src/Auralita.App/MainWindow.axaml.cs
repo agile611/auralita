@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        MacMediaSession.Enable(HandleMediaCommand, HandleMediaSeek);
         QueueList.ItemsSource = _entries;
         _playbackTimer.Interval = TimeSpan.FromMilliseconds(500);
         _playbackTimer.Tick += OnPlaybackTimerTick;
@@ -63,6 +64,62 @@ public partial class MainWindow : Window
 
     private void OnMenuPlexClick(object? sender, EventArgs e) =>
         OnPlexClick(sender, new RoutedEventArgs());
+
+    private void HandleMediaCommand(int command)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var args = new RoutedEventArgs();
+            switch (command)
+            {
+                case 0:
+                    OnPlayClick(this, args);
+                    break;
+                case 1:
+                    OnPauseClick(this, args);
+                    break;
+                case 2:
+                    if (_isPlaying)
+                    {
+                        OnPauseClick(this, args);
+                    }
+                    else
+                    {
+                        OnPlayClick(this, args);
+                    }
+
+                    break;
+                case 3:
+                    OnNextClick(this, args);
+                    break;
+                case 4:
+                    OnPreviousClick(this, args);
+                    break;
+            }
+        });
+    }
+
+    private void HandleMediaSeek(double seconds)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_hasActiveTrack)
+            {
+                return;
+            }
+
+            try
+            {
+                _audioPlayer.Seek(TimeSpan.FromSeconds(seconds));
+                UpdatePlaybackProgress();
+                UpdateMediaSession(_isPlaying ? 1 : 2);
+            }
+            catch (InvalidOperationException exception)
+            {
+                StatusText.Text = $"Could not seek in this track: {exception.Message}";
+            }
+        });
+    }
 
     private async void OnWindowOpened(object? sender, EventArgs e)
     {
@@ -251,6 +308,7 @@ public partial class MainWindow : Window
             ReportPlexTimeline(pausedEntryId, "paused");
         }
 
+        UpdateMediaSession(2);
         StatusText.Text = "Playback paused.";
         UpdatePlaybackControls();
     }
@@ -292,6 +350,7 @@ public partial class MainWindow : Window
             }
 
             StatusText.Text = $"Playing {entry.Track.Title}.";
+            UpdateMediaSession(1);
             _playbackTimer.Start();
             UpdatePlaybackProgress();
             UpdatePlaybackControls();
@@ -337,6 +396,7 @@ public partial class MainWindow : Window
             ReportPlexTimeline(stoppedEntryId, "stopped");
         }
 
+        UpdateMediaSession(0);
         _audioPlayer.Stop();
         _playbackTimer.Stop();
         _isPlaying = false;
@@ -494,6 +554,7 @@ public partial class MainWindow : Window
                 }
 
                 UpdatePlaybackProgress();
+                UpdateMediaSession(1);
                 return;
             }
         }
@@ -678,6 +739,25 @@ public partial class MainWindow : Window
             await Dispatcher.UIThread.InvokeAsync(
                 () => StatusText.Text = $"Could not load Plex artwork: {exception.Message}");
         }
+    }
+
+    private void UpdateMediaSession(int state)
+    {
+        if (_activeEntryId is null ||
+            !_entryViewModels.TryGetValue(_activeEntryId.Value, out var viewModel))
+        {
+            return;
+        }
+
+        var track = viewModel.Entry.Track;
+        var duration = (track.Duration ?? _audioPlayer.Duration).TotalSeconds;
+        MacMediaSession.UpdateNowPlaying(
+            track.Title,
+            track.Artist,
+            track.Album,
+            duration,
+            _audioPlayer.CurrentTime.TotalSeconds,
+            state);
     }
 
     private void ReportPlexTimeline(Guid entryId, string state)

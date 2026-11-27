@@ -1,5 +1,6 @@
 #import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
+#import <MediaPlayer/MediaPlayer.h>
 #import <Security/Security.h>
 #include <dispatch/dispatch.h>
 #include <math.h>
@@ -302,5 +303,97 @@ int32_t auralita_keychain_delete(const char *account)
             (__bridge id)kSecAttrAccount: accountValue
         };
         return (int32_t)SecItemDelete((__bridge CFDictionaryRef)query);
+    }
+}
+
+typedef void (*AuralitaCommandHandler)(int command);
+typedef void (*AuralitaSeekHandler)(double seconds);
+
+static AuralitaCommandHandler gCommandHandler;
+static AuralitaSeekHandler gSeekHandler;
+
+static void AuralitaHandleCommand(int command)
+{
+    if (gCommandHandler != NULL) {
+        gCommandHandler(command);
+    }
+}
+
+void auralita_media_session_set_handlers(AuralitaCommandHandler commandHandler, AuralitaSeekHandler seekHandler)
+{
+    gCommandHandler = commandHandler;
+    gSeekHandler = seekHandler;
+
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        MPRemoteCommandCenter *center = [MPRemoteCommandCenter sharedCommandCenter];
+        center.playCommand.enabled = YES;
+        [center.playCommand addTargetWithHandler:^(MPRemoteCommandEvent *event) {
+            AuralitaHandleCommand(0);
+            return MPRemoteCommandHandlerStatusSuccess;
+        }];
+        center.pauseCommand.enabled = YES;
+        [center.pauseCommand addTargetWithHandler:^(MPRemoteCommandEvent *event) {
+            AuralitaHandleCommand(1);
+            return MPRemoteCommandHandlerStatusSuccess;
+        }];
+        center.togglePlayPauseCommand.enabled = YES;
+        [center.togglePlayPauseCommand addTargetWithHandler:^(MPRemoteCommandEvent *event) {
+            AuralitaHandleCommand(2);
+            return MPRemoteCommandHandlerStatusSuccess;
+        }];
+        center.nextTrackCommand.enabled = YES;
+        [center.nextTrackCommand addTargetWithHandler:^(MPRemoteCommandEvent *event) {
+            AuralitaHandleCommand(3);
+            return MPRemoteCommandHandlerStatusSuccess;
+        }];
+        center.previousTrackCommand.enabled = YES;
+        [center.previousTrackCommand addTargetWithHandler:^(MPRemoteCommandEvent *event) {
+            AuralitaHandleCommand(4);
+            return MPRemoteCommandHandlerStatusSuccess;
+        }];
+        center.changePlaybackPositionCommand.enabled = YES;
+        [center.changePlaybackPositionCommand addTargetWithHandler:^(MPRemoteCommandEvent *event) {
+            if (gSeekHandler != NULL) {
+                gSeekHandler([(MPChangePlaybackPositionCommandEvent *)event positionTime]);
+            }
+            return MPRemoteCommandHandlerStatusSuccess;
+        }];
+    });
+}
+
+void auralita_media_session_update_now_playing(
+    const char *title,
+    const char *artist,
+    const char *album,
+    double durationSeconds,
+    double elapsedSeconds,
+    int state)
+{
+    @autoreleasepool {
+        MPNowPlayingInfoCenter *center = [MPNowPlayingInfoCenter defaultCenter];
+        if (state == 0) {
+            center.nowPlayingInfo = nil;
+            return;
+        }
+
+        NSMutableDictionary *info = [NSMutableDictionary dictionary];
+        if (title != NULL) {
+            info[MPMediaItemPropertyTitle] = [NSString stringWithUTF8String:title];
+        }
+        if (artist != NULL) {
+            info[MPMediaItemPropertyArtist] = [NSString stringWithUTF8String:artist];
+        }
+        if (album != NULL) {
+            info[MPMediaItemPropertyAlbumTitle] = [NSString stringWithUTF8String:album];
+        }
+        if (isfinite(durationSeconds) && durationSeconds > 0) {
+            info[MPMediaItemPropertyPlaybackDuration] = @(durationSeconds);
+        }
+        if (isfinite(elapsedSeconds) && elapsedSeconds >= 0) {
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(elapsedSeconds);
+        }
+        info[MPNowPlayingInfoPropertyPlaybackRate] = state == 1 ? @1.0 : @0.0;
+        center.nowPlayingInfo = info;
     }
 }
