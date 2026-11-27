@@ -1,4 +1,5 @@
 #import <AVFoundation/AVFoundation.h>
+#import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <Security/Security.h>
@@ -311,6 +312,7 @@ typedef void (*AuralitaSeekHandler)(double seconds);
 
 static AuralitaCommandHandler gCommandHandler;
 static AuralitaSeekHandler gSeekHandler;
+static NSImage *gArtwork;
 
 static void AuralitaHandleCommand(int command)
 {
@@ -394,6 +396,38 @@ void auralita_media_session_update_now_playing(
             info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(elapsedSeconds);
         }
         info[MPNowPlayingInfoPropertyPlaybackRate] = state == 1 ? @1.0 : @0.0;
+        if (gArtwork != nil) {
+            CGSize bounds = gArtwork.size;
+            MPMediaItemArtwork *artwork = [[MPMediaItemArtwork alloc] initWithBoundsSize:bounds requestHandler:^NSImage *(CGSize requestedSize) {
+                NSImage *image = [[NSImage alloc] initWithSize:requestedSize];
+                [image lockFocus];
+                [gArtwork drawInRect:NSMakeRect(0, 0, requestedSize.width, requestedSize.height)
+                            fromRect:NSZeroRect
+                           operation:NSCompositingOperationCopy
+                            fraction:1.0];
+                [image unlockFocus];
+                return image;
+            }];
+            info[MPMediaItemPropertyArtwork] = artwork;
+        }
         center.nowPlayingInfo = info;
     }
+}
+
+void auralita_media_session_set_artwork(const void *bytes, int32_t length)
+{
+    @autoreleasepool {
+        if (bytes == NULL || length <= 0) {
+            gArtwork = nil;
+            return;
+        }
+
+        NSData *data = [NSData dataWithBytes:bytes length:(NSUInteger)length];
+        gArtwork = [[NSImage alloc] initWithData:data];
+    }
+}
+
+void auralita_media_session_clear_artwork(void)
+{
+    gArtwork = nil;
 }

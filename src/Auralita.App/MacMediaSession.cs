@@ -48,6 +48,26 @@ internal static partial class MacMediaSession
             state);
     }
 
+    public static void SetArtwork(byte[]? pngBytes)
+    {
+        if (!OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
+        Native.SetArtwork(pngBytes, pngBytes?.Length ?? 0);
+    }
+
+    public static void ClearArtwork()
+    {
+        if (!OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
+        Native.ClearArtwork();
+    }
+
     private static unsafe IntPtr CommandPointer =>
         (IntPtr)(void*)(delegate* unmanaged[Cdecl]<int, void>)&OnCommand;
 
@@ -87,5 +107,11 @@ internal static partial class MacMediaSession
             double durationSeconds,
             double elapsedSeconds,
             int state);
+
+        [LibraryImport("AuralitaAudio", EntryPoint = "auralita_media_session_set_artwork")]
+        internal static partial void SetArtwork(byte[]? bytes, int length);
+
+        [LibraryImport("AuralitaAudio", EntryPoint = "auralita_media_session_clear_artwork")]
+        internal static partial void ClearArtwork();
     }
 }

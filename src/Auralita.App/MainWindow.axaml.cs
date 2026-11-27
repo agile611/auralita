@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Auralita.Core.Domain;
@@ -351,6 +352,7 @@ public partial class MainWindow : Window
 
             StatusText.Text = $"Playing {entry.Track.Title}.";
             UpdateMediaSession(1);
+            UpdateMediaSessionArtwork();
             _playbackTimer.Start();
             UpdatePlaybackProgress();
             UpdatePlaybackControls();
@@ -397,6 +399,7 @@ public partial class MainWindow : Window
         }
 
         UpdateMediaSession(0);
+        MacMediaSession.ClearArtwork();
         _audioPlayer.Stop();
         _playbackTimer.Stop();
         _isPlaying = false;
@@ -720,6 +723,7 @@ public partial class MainWindow : Window
                 if (_activeEntryId == viewModel.Entry.Id)
                 {
                     NowPlayingArtwork.Source = artwork;
+                    UpdateMediaSessionArtwork();
                 }
             });
         }
@@ -739,6 +743,21 @@ public partial class MainWindow : Window
             await Dispatcher.UIThread.InvokeAsync(
                 () => StatusText.Text = $"Could not load Plex artwork: {exception.Message}");
         }
+    }
+
+    private void UpdateMediaSessionArtwork()
+    {
+        if (_activeEntryId is null ||
+            !_entryViewModels.TryGetValue(_activeEntryId.Value, out var viewModel) ||
+            viewModel.Artwork is not { } artwork)
+        {
+            MacMediaSession.ClearArtwork();
+            return;
+        }
+
+        using var stream = new MemoryStream();
+        artwork.Save(stream, PngBitmapEncoderOptions.Default);
+        MacMediaSession.SetArtwork(stream.ToArray());
     }
 
     private void UpdateMediaSession(int state)
