@@ -17,6 +17,7 @@ public sealed class PlexClient : IDisposable
     private readonly bool _ownsHttpClient;
     private readonly string _token;
     private Uri? _activeServer;
+    private IReadOnlyList<PlexLibrarySection>? _activeMusicLibraries;
     private bool _disposed;
 
     public PlexClient(PlexServerSettings settings, string token, HttpClient? httpClient = null)
@@ -42,8 +43,23 @@ public sealed class PlexClient : IDisposable
     {
         ThrowIfDisposed();
         var server = await ResolveServerAsync(cancellationToken).ConfigureAwait(false);
-        var xml = await GetXmlAsync(new Uri(server, "library/sections"), cancellationToken)
+        if (_activeMusicLibraries is not null)
+        {
+            return _activeMusicLibraries;
+        }
+
+        _activeMusicLibraries = await ReadMusicLibrariesAsync(server, cancellationToken)
             .ConfigureAwait(false);
+        return _activeMusicLibraries;
+    }
+
+    private async Task<IReadOnlyList<PlexLibrarySection>> ReadMusicLibrariesAsync(
+        Uri server,
+        CancellationToken cancellationToken)
+    {
+        var xml = await GetXmlAsync(
+            new Uri(server, "library/sections"),
+            cancellationToken).ConfigureAwait(false);
         var container = xml.Root;
         if (container?.Name.LocalName != MediaContainerName.LocalName)
         {
@@ -259,24 +275,62 @@ public sealed class PlexClient : IDisposable
             .Distinct()
             .ToArray();
 
+        Uri? firstAccessibleServer = null;
+        IReadOnlyList<PlexLibrarySection>? firstAccessibleLibraries = null;
+        PlexConnectionException? lastConnectionError = null;
         foreach (var candidate in candidates)
         {
             try
             {
-                var sections = await GetXmlAsync(
-                    new Uri(candidate, "library/sections"),
-                    cancellationToken).ConfigureAwait(false);
-                if (sections.Root?.Name.LocalName != MediaContainerName.LocalName)
+                var libraries = await ReadMusicLibrariesAsync(candidate, cancellationToken)
+                    .ConfigureAwait(false);
+                firstAccessibleServer ??= candidate;
+                firstAccessibleLibraries ??= libraries;
+
+                if (string.IsNullOrWhiteSpace(Settings.LibrarySectionKey))
+                {
+                    if (libraries.Count == 0)
+                    {
+                        continue;
+                    }
+                }
+                else if (!libraries.Any(library =>
+                             string.Equals(
+                                 library.Key,
+                                 Settings.LibrarySectionKey,
+                                 StringComparison.Ordinal)))
                 {
                     continue;
                 }
 
                 _activeServer = candidate;
+                _activeMusicLibraries = libraries;
                 return candidate;
             }
-            catch (PlexConnectionException) when (!cancellationToken.IsCancellationRequested)
+            catch (PlexConnectionException exception) when (!cancellationToken.IsCancellationRequested)
             {
+                lastConnectionError = exception;
             }
+        }
+
+        if (firstAccessibleServer is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(Settings.LibrarySectionKey))
+            {
+                throw new PlexConnectionException(
+                    "The saved Plex music library was not found on an accessible server. Reconnect and select a library again.");
+            }
+
+            _activeServer = firstAccessibleServer;
+            _activeMusicLibraries = firstAccessibleLibraries ?? [];
+            return firstAccessibleServer;
+        }
+
+        if (lastConnectionError is not null)
+        {
+            throw new PlexConnectionException(
+                lastConnectionError.Message,
+                lastConnectionError);
         }
 
         throw new PlexConnectionException(

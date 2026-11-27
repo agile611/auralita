@@ -34,42 +34,47 @@ public sealed class PlexClientTests
     }
 
     [Fact]
-    public async Task PlexWebAppDiscoversAndUsesAnAccessibleServer()
+    public async Task PlexWebAppFindsMusicLibraryOnLaterServer()
     {
         var requests = new List<string>();
-        var handler = new StubHandler((request, _) =>
-        {
-            requests.Add(request.RequestUri!.ToString());
-            if (request.RequestUri.Host == "plex.tv")
-            {
-                Assert.Equal("test-token", request.Headers.GetValues("X-Plex-Token").Single());
-                return XmlResponse("""
-                    <MediaContainer>
-                      <Device provides="server">
-                        <Connection uri="https://plex.example:32400" local="0" />
-                        <Connection uri="http://plex.local:32400" local="1" />
-                      </Device>
-                    </MediaContainer>
-                    """);
-            }
-
-            if (request.RequestUri.AbsolutePath == "/identity")
-            {
-                return XmlResponse("<MediaContainer machineIdentifier=\"test\" />");
-            }
-
-            return XmlResponse("""
-                <MediaContainer>
-                  <Directory key="2" title="Music" type="music" />
-                </MediaContainer>
-                """);
-        });
-        using var client = CreateClient("https://app.plex.tv", handler);
+        var handler = CreateMultiServerHandler(requests);
+        using var client = new PlexClient(
+            new PlexServerSettings(new Uri("https://app.plex.tv"), string.Empty),
+            "test-token",
+            new HttpClient(handler));
 
         var libraries = await client.GetMusicLibrariesAsync();
 
-        Assert.Single(libraries);
-        Assert.Equal("http://plex.local:32400/library/sections", requests[^1]);
+        var library = Assert.Single(libraries);
+        Assert.Equal(new PlexLibrarySection("2", "Remote Music"), library);
+        Assert.Contains("http://plex.local:32400/library/sections", requests);
+        Assert.Equal("https://plex.example:32400/library/sections", requests[^1]);
+
+        var track = Assert.Single(await client.GetTracksAsync(library.Key));
+        Assert.Equal("Remote song", track.Title);
+        Assert.Equal(
+            "https://plex.example:32400/library/parts/10/file?X-Plex-Token=test-token",
+            track.Source!.AbsoluteUri);
+        Assert.Equal(
+            "https://plex.example:32400/library/sections/2/all?type=10",
+            requests[^1]);
+    }
+
+    [Fact]
+    public async Task PlexWebAppRestoresTheSelectedLibraryFromMatchingServer()
+    {
+        var requests = new List<string>();
+        var handler = CreateMultiServerHandler(requests);
+        using var client = new PlexClient(
+            new PlexServerSettings(new Uri("https://app.plex.tv"), "2"),
+            "test-token",
+            new HttpClient(handler));
+
+        var libraries = await client.GetMusicLibrariesAsync();
+
+        var library = Assert.Single(libraries);
+        Assert.Equal(new PlexLibrarySection("2", "Remote Music"), library);
+        Assert.Equal("https://plex.example:32400/library/sections", requests[^1]);
     }
 
     [Fact]
@@ -208,6 +213,51 @@ public sealed class PlexClientTests
             new PlexServerSettings(new Uri(serverUrl), "1"),
             "test-token",
             new HttpClient(handler));
+
+    private static HttpMessageHandler CreateMultiServerHandler(List<string> requests) =>
+        new StubHandler((request, _) =>
+        {
+            var requestUri = request.RequestUri!;
+            requests.Add(requestUri.ToString());
+            if (requestUri.Host == "plex.tv")
+            {
+                Assert.Equal("test-token", request.Headers.GetValues("X-Plex-Token").Single());
+                return XmlResponse("""
+                    <MediaContainer>
+                      <Device provides="server">
+                        <Connection uri="https://plex.example:32400" local="0" />
+                        <Connection uri="http://plex.local:32400" local="1" />
+                      </Device>
+                    </MediaContainer>
+                    """);
+            }
+
+            if (requestUri.AbsolutePath.EndsWith("/all", StringComparison.Ordinal))
+            {
+                return XmlResponse("""
+                    <MediaContainer>
+                      <Track title="Remote song">
+                        <Media><Part key="/library/parts/10/file" /></Media>
+                      </Track>
+                    </MediaContainer>
+                    """);
+            }
+
+            if (requestUri.Host == "plex.local")
+            {
+                return XmlResponse("""
+                    <MediaContainer>
+                      <Directory key="1" title="Movies" type="movie" />
+                    </MediaContainer>
+                    """);
+            }
+
+            return XmlResponse("""
+                <MediaContainer>
+                  <Directory key="2" title="Remote Music" type="artist" />
+                </MediaContainer>
+                """);
+        });
 
     private static HttpResponseMessage XmlResponse(string xml) =>
         new(HttpStatusCode.OK)
