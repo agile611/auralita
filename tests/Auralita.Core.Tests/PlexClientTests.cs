@@ -83,7 +83,7 @@ public sealed class PlexClientTests
     }
 
     [Fact]
-    public async Task ServerDiscoveryPrefersNonRelayHttpsConnections()
+    public async Task ServerDiscoverySkipsUnreachableConnectionsAndUsesSecureHttps()
     {
         var requests = new List<string>();
         var handler = new StubHandler((request, _) =>
@@ -104,6 +104,11 @@ public sealed class PlexClientTests
                     """);
             }
 
+            if (uri.Host is "plex.local" or "plex.relay")
+            {
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+            }
+
             AssertPlexHeaders(request, "secure-token");
             return XmlResponse("""
                 <MediaContainer>
@@ -121,7 +126,6 @@ public sealed class PlexClientTests
 
         Assert.Equal(new PlexLibrarySection("7", "Secure music"), Assert.Single(libraries));
         Assert.Contains("https://plex.secure:32400/library/sections", requests);
-        Assert.DoesNotContain(requests, request => request.Contains("plex.local"));
         Assert.DoesNotContain(requests, request => request.Contains("plex.relay"));
     }
 

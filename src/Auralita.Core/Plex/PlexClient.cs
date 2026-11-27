@@ -42,7 +42,7 @@ public sealed class PlexClient : IDisposable
         _httpClient = httpClient ?? new HttpClient(
             new HttpClientHandler { AllowAutoRedirect = false })
         {
-            Timeout = TimeSpan.FromSeconds(15)
+            Timeout = TimeSpan.FromSeconds(30)
         };
         _ownsHttpClient = httpClient is null;
     }
@@ -276,10 +276,40 @@ public sealed class PlexClient : IDisposable
         }
 
         // Account credentials discover servers; each server's access token authenticates its own library and media requests.
-        var resources = await GetApiResponseAsync(
-            PlexResourcesUri,
-            _accountToken,
-            cancellationToken).ConfigureAwait(false);
+        PlexElement? resources;
+        try
+        {
+            resources = await GetApiResponseAsync(
+                PlexResourcesUri,
+                _accountToken,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (PlexAuthenticationException)
+        {
+            throw;
+        }
+        catch (PlexConnectionException)
+        {
+            if (IsPlexWebApp(Settings.ServerUrl))
+            {
+                throw;
+            }
+
+            resources = null;
+        }
+
+        if (resources is null)
+        {
+            var directServer = EnsureTrailingSlash(Settings.ServerUrl);
+            _activeServer = directServer;
+            _activeServerToken = _accountToken;
+            _activeMusicLibraries = await ReadMusicLibrariesAsync(
+                directServer,
+                _accountToken,
+                cancellationToken).ConfigureAwait(false);
+            return directServer;
+        }
+
         var candidates = resources.DescendantsAndSelf()
             .Where(element =>
                 string.Equals(element.Name, "Device", StringComparison.OrdinalIgnoreCase) &&
@@ -296,9 +326,9 @@ public sealed class PlexClient : IDisposable
             .Where(candidate => candidate is not null)
             .Cast<PlexServerCandidate>()
             .OrderBy(candidate => candidate.Relay)
+            .ThenByDescending(candidate => candidate.Local)
             .ThenByDescending(candidate =>
                 string.Equals(candidate.Uri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
-            .ThenByDescending(candidate => candidate.Local)
             .DistinctBy(candidate => candidate.Uri)
             .ToArray();
         if (!IsPlexWebApp(Settings.ServerUrl))
@@ -338,10 +368,12 @@ public sealed class PlexClient : IDisposable
         {
             try
             {
+                using var probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                probeCancellation.CancelAfter(TimeSpan.FromSeconds(8));
                 var libraries = await ReadMusicLibrariesAsync(
                         candidate.Uri,
                         candidate.AccessToken,
-                        cancellationToken)
+                        probeCancellation.Token)
                     .ConfigureAwait(false);
                 firstAccessibleServer ??= candidate;
                 firstAccessibleLibraries ??= libraries;
@@ -370,6 +402,11 @@ public sealed class PlexClient : IDisposable
             catch (PlexAuthenticationException exception)
             {
                 lastAuthenticationError = exception;
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                lastConnectionError = new PlexConnectionException(
+                    $"Plex server {candidate.Uri} did not answer quickly enough.");
             }
             catch (PlexConnectionException exception) when (!cancellationToken.IsCancellationRequested)
             {
