@@ -131,9 +131,9 @@ below.
 
 - **NFR-PERF-1:** Cold start shall complete in under one second.
 - **NFR-PERF-2:** On Tier 1 hardware, idle/active memory shall remain below
-  120 MB/350 MB. The player may pre-buffer the next three tracks, use 32-bit
+  120 MB/350 MB. The player shall pre-buffer the next three tracks, use 32-bit
   float internal DSP, perform concurrent library scans, and offer bit-perfect
-  exclusive DAC mode.
+  exclusive DAC mode where supported.
 - **NFR-PERF-3:** On Tier 2 hardware, idle/active memory shall remain below
   85 MB/220 MB. The player shall use a single-track ring buffer and throttle
   SQLite WAL indexing to at most two worker threads.

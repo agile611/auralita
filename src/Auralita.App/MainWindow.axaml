@@ -1,0 +1,216 @@
+<Window
+    x:Class="Auralita.App.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="clr-namespace:Auralita.Core.Domain;assembly=Auralita.Core"
+    Title="Auralita"
+    Width="920"
+    Height="680"
+    MinWidth="700"
+    MinHeight="520"
+    WindowStartupLocation="CenterScreen">
+  <NativeMenu.Menu>
+    <NativeMenu>
+      <NativeMenuItem Header="_File">
+        <NativeMenuItem.Menu>
+          <NativeMenu>
+            <NativeMenuItem
+                Header="Add Music…"
+                Gesture="Meta+O"
+                Click="OnMenuOpenClick" />
+            <NativeMenuItemSeparator />
+            <NativeMenuItem
+                Header="Quit Auralita"
+                Gesture="Meta+Q"
+                Click="OnMenuQuitClick" />
+          </NativeMenu>
+        </NativeMenuItem.Menu>
+      </NativeMenuItem>
+      <NativeMenuItem Header="_Playback">
+        <NativeMenuItem.Menu>
+          <NativeMenu>
+            <NativeMenuItem
+                Header="Play Selected Track"
+                Gesture="Meta+P"
+                Click="OnMenuPlayClick" />
+            <NativeMenuItem
+                Header="Stop Playback"
+                Click="OnMenuStopClick" />
+          </NativeMenu>
+        </NativeMenuItem.Menu>
+      </NativeMenuItem>
+    </NativeMenu>
+  </NativeMenu.Menu>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="28" RowSpacing="20">
+    <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+      <Viewbox Width="58" Height="58" Stretch="Uniform">
+        <Canvas Width="64" Height="64">
+          <Path
+              Data="M 25,5 L 39,5 L 49,23 L 32,60 L 15,23 Z"
+              Fill="#65459B"
+              Stroke="#35234F"
+              StrokeThickness="1.5" />
+          <Path Data="M 25,5 L 32,23 L 15,23 Z" Fill="#B49ADA" />
+          <Path Data="M 39,5 L 32,23 L 49,23 Z" Fill="#8B6ABD" />
+          <Path Data="M 15,23 L 32,23 L 32,60 Z" Fill="#7756AA" />
+          <Path Data="M 32,23 L 49,23 L 32,60 Z" Fill="#50367F" />
+          <Path
+              Data="M 5,31 L 15,25 L 24,37 L 17,54 L 7,44 Z"
+              Fill="#8061B3"
+              Stroke="#493263"
+              StrokeThickness="1.2" />
+          <Path Data="M 5,31 L 15,25 L 15,40 L 7,44 Z" Fill="#B49ADA" />
+          <Path
+              Data="M 40,37 L 50,25 L 59,32 L 57,44 L 47,54 Z"
+              Fill="#71529F"
+              Stroke="#493263"
+              StrokeThickness="1.2" />
+          <Path Data="M 50,25 L 59,32 L 57,44 L 49,40 Z" Fill="#9B7ACB" />
+          <Path Data="M 28,12 L 32,9 L 36,12 L 32,16 Z" Fill="#D99682" />
+        </Canvas>
+      </Viewbox>
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0" Spacing="2">
+        <TextBlock FontSize="28" FontWeight="Bold" Text="AURALITA" />
+        <TextBlock Classes="mono" FontSize="11" Opacity="0.7" Text="CRYSTAL AUDIO DECK  /  LOCAL LIBRARY" />
+      </StackPanel>
+      <Button
+          x:Name="AddTracksButton"
+          Grid.Column="2"
+          Classes="accent"
+          VerticalAlignment="Center"
+          Content="OPEN FILES"
+          Click="OnAddTracksClick" />
+    </Grid>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto,Auto">
+      <Button x:Name="MoveUpButton" Grid.Column="1" Content="MOVE UP" Click="OnMoveUpClick" />
+      <Button x:Name="MoveDownButton" Grid.Column="2" Content="MOVE DOWN" Click="OnMoveDownClick" />
+      <Button x:Name="RemoveButton" Grid.Column="3" Content="REMOVE" Click="OnRemoveClick" />
+    </Grid>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+      <StackPanel Spacing="3">
+        <TextBlock FontFamily="Menlo" FontSize="18" FontWeight="Bold" Text="PLAYLIST" />
+        <TextBlock Opacity="0.7" Text="Select a track, then press Play to listen." />
+      </StackPanel>
+      <Border Grid.Column="1" VerticalAlignment="Center" Background="#111111" BorderBrush="#5B5B5B" BorderThickness="1" CornerRadius="2" Padding="12,6">
+        <TextBlock x:Name="QueueCountText" Classes="lcd" Text="00 TRACKS" />
+      </Border>
+    </Grid>
+
+    <Grid Grid.Row="3">
+      <ListBox
+          x:Name="QueueList"
+          Background="Transparent"
+          BorderThickness="0"
+          SelectionChanged="OnSelectionChanged">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="core:QueueEntry">
+            <StackPanel Margin="12,10" Spacing="3">
+              <TextBlock FontWeight="SemiBold" Text="{Binding Track.Title}" />
+              <TextBlock Opacity="0.7" Text="{Binding Track.Artist}" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+      <StackPanel
+          x:Name="EmptyQueuePanel"
+          HorizontalAlignment="Center"
+          VerticalAlignment="Center"
+          Spacing="10">
+        <Viewbox Width="48" Height="48" Stretch="Uniform">
+          <Canvas Width="64" Height="64">
+            <Path Data="M 25,5 L 39,5 L 49,23 L 32,60 L 15,23 Z" Fill="#65459B" />
+            <Path Data="M 25,5 L 32,23 L 15,23 Z" Fill="#B49ADA" />
+            <Path Data="M 39,5 L 32,23 L 49,23 Z" Fill="#8B6ABD" />
+            <Path Data="M 15,23 L 32,23 L 32,60 Z" Fill="#7756AA" />
+            <Path Data="M 32,23 L 49,23 L 32,60 Z" Fill="#50367F" />
+          </Canvas>
+        </Viewbox>
+        <TextBlock HorizontalAlignment="Center" FontFamily="Menlo" FontSize="18" FontWeight="SemiBold" Text="YOUR PLAYLIST IS EMPTY" />
+        <TextBlock
+            HorizontalAlignment="Center"
+            MaxWidth="340"
+            TextAlignment="Center"
+            Opacity="0.7"
+            Text="Open music from your Mac to start listening. Your files stay where they are." />
+        <Button Classes="accent" Content="CHOOSE MUSIC" Click="OnAddTracksClick" />
+      </StackPanel>
+    </Grid>
+
+    <Border Grid.Row="4" Background="#111111" BorderBrush="#5B5B5B" BorderThickness="1" CornerRadius="2" Padding="14">
+      <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*">
+          <Viewbox Width="22" Height="22" VerticalAlignment="Center" Stretch="Uniform">
+            <Path Data="M 0,0 L 18,11 L 0,22 Z" Fill="#B8EC60" />
+          </Viewbox>
+          <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="3">
+            <TextBlock x:Name="NowPlayingText" Classes="lcd" Text="-- NOTHING PLAYING --" />
+            <TextBlock x:Name="StatusText" Classes="mono" FontSize="11" Opacity="0.7" Text="Open files to begin." />
+          </StackPanel>
+        </Grid>
+        <Grid
+            x:Name="ProgressTrack"
+            Grid.Row="1"
+            Height="10"
+            Background="#303030"
+            ClipToBounds="True">
+          <Border
+              x:Name="ProgressFill"
+              HorizontalAlignment="Left"
+              Width="0"
+              Background="#B8EC60" />
+        </Grid>
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,*">
+          <TextBlock
+              x:Name="ElapsedTimeText"
+              Classes="lcd mono"
+              VerticalAlignment="Center"
+              Text="00:00" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+            <Button
+                x:Name="PreviousButton"
+                IsEnabled="False"
+                MinWidth="82"
+                Click="OnPreviousClick">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Path Data="M 0,7 L 10,0 L 10,14 Z M 12,0 L 15,0 L 15,14 L 12,14 Z" Fill="#D4D4D4" />
+                <TextBlock Text="PREV" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="PlayButton" Classes="accent" IsEnabled="False" MinWidth="88" Click="OnPlayClick">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Path Data="M 0,0 L 12,7 L 0,14 Z" Fill="#1A2012" />
+                <TextBlock Foreground="#1A2012" Text="PLAY" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="StopButton" IsEnabled="False" MinWidth="82" Click="OnStopClick">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Path Data="M 1,1 L 13,1 L 13,13 L 1,13 Z" Fill="#D4D4D4" />
+                <TextBlock Text="STOP" />
+              </StackPanel>
+            </Button>
+            <Button
+                x:Name="NextButton"
+                IsEnabled="False"
+                MinWidth="82"
+                Click="OnNextClick">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Path Data="M 0,0 L 10,7 L 0,14 Z M 12,0 L 22,7 L 12,14 Z M 24,0 L 27,0 L 27,14 L 24,14 Z" Fill="#D4D4D4" />
+                <TextBlock Text="NEXT" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+          <TextBlock
+              x:Name="RemainingTimeText"
+              Grid.Column="2"
+              Classes="lcd mono"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Center"
+              Text="--:--" />
+        </Grid>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

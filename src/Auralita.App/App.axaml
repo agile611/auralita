@@ -1,0 +1,131 @@
+<Application
+    x:Class="Auralita.App.App"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    RequestedThemeVariant="Dark">
+  <Application.Styles>
+    <Style Selector="Window">
+      <Setter Property="Background" Value="#202020" />
+      <Setter Property="Foreground" Value="#D4D4D4" />
+    </Style>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="#D4D4D4" />
+    </Style>
+    <Style Selector="TextBlock.lcd">
+      <Setter Property="Foreground" Value="#B8EC60" />
+      <Setter Property="FontFamily" Value="Menlo" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="TextBlock.mono">
+      <Setter Property="FontFamily" Value="Menlo" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="Background" Value="#333333" />
+      <Setter Property="Foreground" Value="#E0E0E0" />
+      <Setter Property="BorderBrush" Value="#666666" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border
+              Name="PART_Border"
+              Background="{TemplateBinding Background}"
+              BorderBrush="{TemplateBinding BorderBrush}"
+              BorderThickness="{TemplateBinding BorderThickness}"
+              CornerRadius="2">
+            <ContentPresenter
+                Name="PART_ContentPresenter"
+                Content="{TemplateBinding Content}"
+                ContentTemplate="{TemplateBinding ContentTemplate}"
+                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                Padding="{TemplateBinding Padding}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button:pointerover /template/ Border#PART_Border">
+      <Setter Property="Background" Value="#414141" />
+      <Setter Property="BorderBrush" Value="#A7D94A" />
+    </Style>
+    <Style Selector="Button:pressed /template/ Border#PART_Border">
+      <Setter Property="Background" Value="#282828" />
+    </Style>
+    <Style Selector="Button:disabled">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="Button.accent">
+      <Setter Property="Background" Value="#A7D94A" />
+      <Setter Property="Foreground" Value="#171A12" />
+      <Setter Property="BorderBrush" Value="#D5F384" />
+      <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="Button.accent:pointerover /template/ Border#PART_Border">
+      <Setter Property="Background" Value="#B9ED59" />
+      <Setter Property="BorderBrush" Value="#E6FFA2" />
+    </Style>
+    <Style Selector="ScrollViewer">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ScrollContentPresenter
+              Name="PART_ContentPresenter"
+              Content="{TemplateBinding Content}"
+              ContentTemplate="{TemplateBinding ContentTemplate}"
+              CanHorizontallyScroll="False"
+              CanVerticallyScroll="True" />
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ListBox">
+      <Setter Property="Background" Value="#141414" />
+      <Setter Property="Foreground" Value="#D4D4D4" />
+      <Setter Property="BorderBrush" Value="#565656" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border
+              Background="{TemplateBinding Background}"
+              BorderBrush="{TemplateBinding BorderBrush}"
+              BorderThickness="{TemplateBinding BorderThickness}">
+            <ScrollViewer
+                Name="PART_ScrollViewer"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+              <ItemsPresenter Name="PART_ItemsPresenter" />
+            </ScrollViewer>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Foreground" Value="#D4D4D4" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="4" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border
+              Name="PART_Border"
+              Background="{TemplateBinding Background}"
+              BorderBrush="{TemplateBinding BorderBrush}"
+              BorderThickness="{TemplateBinding BorderThickness}">
+            <ContentPresenter
+                Name="PART_ContentPresenter"
+                Content="{TemplateBinding Content}"
+                ContentTemplate="{TemplateBinding ContentTemplate}"
+                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                Padding="{TemplateBinding Padding}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ListBoxItem:pointerover">
+      <Setter Property="Background" Value="#2C3324" />
+    </Style>
+    <Style Selector="ListBoxItem:selected">
+      <Setter Property="Background" Value="#394A27" />
+      <Setter Property="Foreground" Value="#DFFF9A" />
+    </Style>
+  </Application.Styles>
+</Application>

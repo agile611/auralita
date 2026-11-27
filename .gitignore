@@ -1,0 +1,70 @@
+# .NET / Avalonia build output
+**/bin/
+**/obj/
+/artifacts/
+/publish/
+/release/
+/.tooling/
+**/TestResults/
+**/coverage/
+coverage.*
+
+# IDE and user-specific files
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# macOS and Xcode
+.DS_Store
+.AppleDouble
+._*
+.Spotlight-V100
+.Trashes
+.TemporaryItems
+DerivedData/
+**/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+*.dSYM/
+*.xcarchive/
+*.dmg
+
+# Swift and native build output
+.build/
+**/.build/
+/native/build/
+**/native/build/
+*.dylib
+*.dll
+*.so
+*.a
+*.o
+*.obj
+*.pdb
+
+# Local databases and runtime logs
+/data/
+/local-data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.db.corrupt.*
+*.sqlite.corrupt.*
+*.log
+/logs/
+
+# Local environment and signing secrets
+.env
+.env.*
+!.env.example
+!.env.template
+*.p12
+*.pfx
+*.mobileprovision
+*.provisionprofile
+*.keychain
