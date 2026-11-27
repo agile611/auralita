@@ -254,7 +254,7 @@ public partial class MainWindow : Window
             _isPlaying = true;
             _isPaused = false;
             _hasActiveTrack = true;
-            NowPlayingText.Text = entry.Track.Title.ToUpperInvariant();
+            NowPlayingText.Text = entry.Track.Title;
             NowPlayingDetailsText.Text = $"{entry.Track.Artist}  ·  {entry.Track.Album}";
             NowPlayingArtwork.Source = _entryViewModels.GetValueOrDefault(entry.Id)?.Artwork;
             StatusText.Text = $"Playing {entry.Track.Title}.";
@@ -301,7 +301,7 @@ public partial class MainWindow : Window
         _hasActiveTrack = false;
         _activeEntryId = null;
         _activeTrackIsRemote = false;
-        NowPlayingText.Text = "-- NOTHING PLAYING --";
+        NowPlayingText.Text = "Nothing playing";
         NowPlayingDetailsText.Text = string.Empty;
         NowPlayingArtwork.Source = null;
         StatusText.Text = "Playback stopped.";
@@ -537,8 +537,8 @@ public partial class MainWindow : Window
     {
         EmptyQueuePanel.IsVisible = _entries.Count == 0;
         QueueCountText.Text = _entries.Count == 1
-            ? "01 TRACK"
-            : $"{_entries.Count:00} TRACKS";
+            ? "1 track"
+            : $"{_entries.Count} tracks";
     }
 
     private PlexClient CreatePlexClient(PlexServerSettings settings, string token)

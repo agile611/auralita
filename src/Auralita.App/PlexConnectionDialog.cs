@@ -29,10 +29,9 @@ internal sealed class PlexConnectionDialog : Window
     };
     private readonly ListBox _libraries = new()
     {
-        MinHeight = 130,
-        Background = new SolidColorBrush(Color.Parse("#141414")),
-        BorderBrush = new SolidColorBrush(Color.Parse("#565656")),
-        BorderThickness = new Thickness(1)
+        MinHeight = 150,
+        Background = Brushes.Transparent,
+        BorderThickness = new Thickness(0)
     };
     private readonly TextBlock _status = new()
     {
@@ -41,17 +40,18 @@ internal sealed class PlexConnectionDialog : Window
     };
     private readonly Button _connectButton = new()
     {
-        Content = "FIND MUSIC LIBRARIES",
+        Content = "Find music libraries",
         Classes = { "accent" }
     };
     private readonly Button _loadButton = new()
     {
-        Content = "LOAD SELECTED LIBRARY",
+        Content = "Load selected library",
         IsEnabled = false
     };
     private readonly Button _cancelButton = new()
     {
-        Content = "CANCEL"
+        Content = "Cancel",
+        Classes = { "quiet" }
     };
     private readonly List<PlexLibrarySection> _sections = [];
     private PlexClient? _client;
@@ -62,9 +62,9 @@ internal sealed class PlexConnectionDialog : Window
     {
         Title = "Connect to Plex";
         Width = 560;
-        Height = 580;
-        MinWidth = 480;
-        MinHeight = 520;
+        Height = 640;
+        MinWidth = 460;
+        MinHeight = 580;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
         _serverUrl.Text = settings?.ServerUrl.AbsoluteUri ?? "https://app.plex.tv";
@@ -80,28 +80,48 @@ internal sealed class PlexConnectionDialog : Window
     {
         var panel = new StackPanel
         {
-            Margin = new Thickness(24),
-            Spacing = 12
+            Margin = new Thickness(26),
+            Spacing = 14
         };
         panel.Children.Add(new TextBlock
         {
-            Text = "PLEX MUSIC",
-            FontSize = 21,
-            FontWeight = FontWeight.Bold,
-            Foreground = new SolidColorBrush(Color.Parse("#B8EC60"))
+            Text = "Connect to Plex",
+            FontSize = 24,
+            FontWeight = FontWeight.Bold
         });
         panel.Children.Add(new TextBlock
         {
-            Text = "Connect to your server, then choose a music library.",
-            Opacity = 0.75
+            Text = "Find your server and choose a music library.",
+            Classes = { "muted" },
+            TextWrapping = TextWrapping.Wrap
         });
-        panel.Children.Add(new TextBlock { Text = "SERVER URL", FontSize = 11 });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Server address",
+            Classes = { "eyebrow" }
+        });
         panel.Children.Add(_serverUrl);
-        panel.Children.Add(new TextBlock { Text = "PLEX TOKEN", FontSize = 11 });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Plex token",
+            Classes = { "eyebrow" }
+        });
         panel.Children.Add(_token);
         panel.Children.Add(_connectButton);
-        panel.Children.Add(new TextBlock { Text = "MUSIC LIBRARY", FontSize = 11 });
-        panel.Children.Add(_libraries);
+        panel.Children.Add(new TextBlock
+        {
+            Text = "Music library",
+            Classes = { "eyebrow" }
+        });
+        panel.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#17151B")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#403A48")),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(4),
+            Child = _libraries
+        });
         panel.Children.Add(new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -109,11 +129,19 @@ internal sealed class PlexConnectionDialog : Window
             Spacing = 8,
             Children = { _cancelButton, _loadButton }
         });
-        panel.Children.Add(_status);
+        panel.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#2B2731")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#403A48")),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(12, 10),
+            Child = _status
+        });
 
         return new Border
         {
-            Background = new SolidColorBrush(Color.Parse("#202020")),
+            Background = new SolidColorBrush(Color.Parse("#17151B")),
             Child = panel
         };
     }
