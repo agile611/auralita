@@ -47,6 +47,15 @@ grep -rn --exclude-dir={.git,node_modules,.venv,workspaceStorage,dist,build,.nex
 * **Never** redirect terminal command outputs to temporary files just to read them back, and **never** copy source files to `/tmp` or other paths for inspection.
 * Print all tool and terminal outputs directly to `stdout` in real-time. If you need to inspect a file, use `cat`, `head`, `tail`, or `read_file` directly on the original source file.
 
+## REPOSITORY SKILLS
+
+Before frontend, visual design, or UX work, check the repository's [`skills/`](./skills/) folder for relevant guidance. In particular:
+
+* [`Frontend.Design.Skills.md`](./skills/Frontend.Design.Skills.md) for product-specific visual direction and design critique.
+* [`UI-UX-Pro-Max.Skills.md`](./skills/UI-UX-Pro-Max.Skills.md) for accessibility, interaction, responsive layout, and UX guidance.
+
+Use these references when relevant, while following the user's brief and the project's existing framework and design patterns. Verify that recommendations apply to the native Avalonia UI rather than copying web-specific guidance directly.
+
 **10. STRICT ANTI-REPETITION & NO-NARRATION GUARD:**
 
 * **Never** repeat phrases, thoughts, or meta-commentary.
