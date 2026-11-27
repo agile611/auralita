@@ -50,7 +50,8 @@ an HTTPS server URL, or `https://app.plex.tv`) and a Plex token, then select
 **FIND MUSIC LIBRARIES** and load a music library. The token is stored in
 Keychain; the server URL and selected library are saved in the per-user Auralita
 application-support folder. Plex streams use AVPlayer and Plex cover art is
-cached in memory while the app is running.
+cached in memory while the app is running. Plex music sections reported as
+either `artist` or `music` are recognized.
 
 ## NativeAOT publish
 

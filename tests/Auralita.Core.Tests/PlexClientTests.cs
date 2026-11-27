@@ -26,7 +26,10 @@ public sealed class PlexClientTests
         var libraries = await client.GetMusicLibrariesAsync();
 
         Assert.Equal(
-            [new PlexLibrarySection("4", "Other music")],
+            [
+                new PlexLibrarySection("3", "Music"),
+                new PlexLibrarySection("4", "Other music")
+            ],
             libraries);
     }
 

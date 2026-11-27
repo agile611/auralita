@@ -53,7 +53,14 @@ public sealed class PlexClient : IDisposable
         return container.Elements()
             .Where(element =>
                 element.Name.LocalName == "Directory" &&
-                string.Equals((string?)element.Attribute("type"), "music", StringComparison.OrdinalIgnoreCase))
+                (string.Equals(
+                     (string?)element.Attribute("type"),
+                     "music",
+                     StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(
+                     (string?)element.Attribute("type"),
+                     "artist",
+                     StringComparison.OrdinalIgnoreCase)))
             .Select(element => new PlexLibrarySection(
                 (string?)element.Attribute("key") ?? string.Empty,
                 (string?)element.Attribute("title") ?? "Untitled music library"))
