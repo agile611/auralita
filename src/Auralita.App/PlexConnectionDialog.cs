@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -14,19 +15,10 @@ internal sealed record PlexConnectionResult(
 
 internal sealed class PlexConnectionDialog : Window
 {
-    private readonly TextBox _serverUrl = new()
-    {
-        PlaceholderText = "https://app.plex.tv or http://plex-host:32400",
-        MinHeight = 38,
-        Padding = new Thickness(10, 7)
-    };
-    private readonly TextBox _token = new()
-    {
-        PlaceholderText = "Plex authentication token",
-        PasswordChar = '•',
-        MinHeight = 38,
-        Padding = new Thickness(10, 7)
-    };
+    private readonly string _clientIdentifier;
+    private readonly IPlexCredentialStore _credentialStore;
+    private readonly PlexServerSettings? _savedSettings;
+    private readonly string? _savedToken;
     private readonly ListBox _libraries = new()
     {
         MinHeight = 150,
@@ -38,9 +30,9 @@ internal sealed class PlexConnectionDialog : Window
         TextWrapping = TextWrapping.Wrap,
         MinHeight = 24
     };
-    private readonly Button _connectButton = new()
+    private readonly Button _signInButton = new()
     {
-        Content = "Find music libraries",
+        Content = "Sign in with Plex",
         Classes = { "accent" }
     };
     private readonly Button _loadButton = new()
@@ -55,24 +47,37 @@ internal sealed class PlexConnectionDialog : Window
     };
     private readonly List<PlexLibrarySection> _sections = [];
     private PlexClient? _client;
+    private CancellationTokenSource? _operationCancellation;
     private string? _connectedToken;
     private bool _isBusy;
 
-    public PlexConnectionDialog(PlexServerSettings? settings, string? savedToken)
+    public PlexConnectionDialog(
+        PlexServerSettings? settings,
+        string? savedToken,
+        string clientIdentifier,
+        IPlexCredentialStore credentialStore)
     {
+        _savedSettings = settings;
+        _savedToken = savedToken;
+        _clientIdentifier = clientIdentifier;
+        _credentialStore = credentialStore;
         Title = "Connect to Plex";
         Width = 560;
-        Height = 640;
+        Height = 600;
         MinWidth = 460;
-        MinHeight = 580;
+        MinHeight = 540;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
-        _serverUrl.Text = settings?.ServerUrl.AbsoluteUri ?? "https://app.plex.tv";
-        _token.Text = savedToken ?? string.Empty;
-        _connectButton.Click += async (_, _) => await FindLibrariesAsync();
+        _signInButton.Click += async (_, _) => await SignInAsync();
         _loadButton.Click += async (_, _) => await LoadSelectedLibraryAsync();
         _cancelButton.Click += (_, _) => Close();
-        Closed += (_, _) => _client?.Dispose();
+        Opened += OnOpened;
+        Closed += (_, _) =>
+        {
+            _operationCancellation?.Cancel();
+            _operationCancellation?.Dispose();
+            _client?.Dispose();
+        };
         Content = CreateContent();
     }
 
@@ -91,23 +96,11 @@ internal sealed class PlexConnectionDialog : Window
         });
         panel.Children.Add(new TextBlock
         {
-            Text = "Find your server and choose a music library.",
+            Text = "Sign in securely with your Plex account. A browser window will open to approve access.",
             Classes = { "muted" },
             TextWrapping = TextWrapping.Wrap
         });
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Server address",
-            Classes = { "eyebrow" }
-        });
-        panel.Children.Add(_serverUrl);
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Plex token",
-            Classes = { "eyebrow" }
-        });
-        panel.Children.Add(_token);
-        panel.Children.Add(_connectButton);
+        panel.Children.Add(_signInButton);
         panel.Children.Add(new TextBlock
         {
             Text = "Music library",
@@ -146,57 +139,118 @@ internal sealed class PlexConnectionDialog : Window
         };
     }
 
-    private async Task FindLibrariesAsync()
+    private async void OnOpened(object? sender, EventArgs e)
+    {
+        if (!string.IsNullOrWhiteSpace(_savedToken))
+        {
+            await FindLibrariesWithTokenAsync(_savedToken);
+        }
+    }
+
+    private async Task SignInAsync()
     {
         if (_isBusy)
         {
             return;
         }
 
-        if (!Uri.TryCreate(_serverUrl.Text?.Trim(), UriKind.Absolute, out var serverUrl) ||
-            serverUrl.Scheme is not ("http" or "https") ||
-            !string.IsNullOrEmpty(serverUrl.UserInfo))
+        _operationCancellation?.Dispose();
+        _operationCancellation = new CancellationTokenSource();
+        var cancellationToken = _operationCancellation.Token;
+        SetBusy(true, "Requesting a secure Plex sign-in code…");
+        try
         {
-            _status.Text = "Enter an HTTP or HTTPS Plex server URL without embedded credentials.";
+            using var authenticationClient = new PlexAuthenticationClient(_clientIdentifier);
+            var pin = await authenticationClient.RequestPinAsync(cancellationToken);
+            var authorizationUri = authenticationClient.CreateAuthorizationUri(pin);
+            using var browser = Process.Start(new ProcessStartInfo(authorizationUri.AbsoluteUri)
+            {
+                UseShellExecute = true
+            }) ?? throw new InvalidOperationException("Could not open the Plex sign-in page.");
+            SetBusy(true, "Approve Auralita in the Plex browser window…");
+            var token = await authenticationClient.PollForAuthenticationTokenAsync(
+                pin,
+                cancellationToken: cancellationToken);
+            _credentialStore.SetPlexToken(token);
+            SetBusy(false);
+            await FindLibrariesWithTokenAsync(token, cancellationToken);
+        }
+        catch (PlexAuthenticationException exception)
+        {
+            _connectedToken = null;
+            _status.Text = ClearSavedToken(exception);
+        }
+        catch (PlexConnectionException exception)
+        {
+            _status.Text = exception.Message;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _status.Text = "Plex sign-in was cancelled.";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or
+                                           System.ComponentModel.Win32Exception or
+                                           IOException or
+                                           UnauthorizedAccessException)
+        {
+            _status.Text = $"Could not complete Plex sign-in: {exception.Message}";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    private async Task FindLibrariesWithTokenAsync(
+        string token,
+        CancellationToken cancellationToken = default)
+    {
+        if (_isBusy)
+        {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(_token.Text))
+        if (!cancellationToken.CanBeCanceled)
         {
-            _status.Text = "Enter a Plex authentication token.";
-            return;
+            _operationCancellation?.Dispose();
+            _operationCancellation = new CancellationTokenSource();
+        }
+        else if (_operationCancellation is null)
+        {
+            _operationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         }
 
-        SetBusy(true, "Connecting to Plex…");
+        cancellationToken = _operationCancellation.Token;
+        SetBusy(true, "Finding Plex servers and music libraries…");
         try
         {
             _client?.Dispose();
             _sections.Clear();
             _libraries.ItemsSource = null;
             _loadButton.IsEnabled = false;
-            _client = new PlexClient(
-                new PlexServerSettings(serverUrl, string.Empty),
-                _token.Text);
-            _connectedToken = _token.Text;
-            _sections.AddRange(await _client.GetMusicLibrariesAsync());
+            var initialSettings = _savedSettings is null
+                ? new PlexServerSettings(new Uri("https://app.plex.tv"), string.Empty)
+                : _savedSettings with { LibrarySectionKey = string.Empty };
+            _client = new PlexClient(initialSettings, token, _clientIdentifier);
+            _connectedToken = token;
+            _sections.AddRange(await _client.GetMusicLibrariesAsync(cancellationToken));
             _libraries.ItemsSource = _sections.Select(section => $"{section.Title}  [{section.Key}]").ToArray();
             _libraries.SelectedIndex = _sections.Count == 1 ? 0 : -1;
             _loadButton.IsEnabled = _sections.Count > 0;
             _status.Text = _sections.Count == 0
-                ? "Connected, but no music libraries were found on this Plex server."
+                ? "Connected, but no music libraries were found on the available Plex servers."
                 : _sections.Count == 1
                     ? "Music library found. Load it to browse tracks."
                     : $"Found {_sections.Count} music libraries. Select one to continue.";
         }
+        catch (PlexAuthenticationException exception)
+        {
+            _connectedToken = null;
+            _status.Text = ClearSavedToken(exception);
+        }
         catch (PlexConnectionException exception)
         {
             _status.Text = exception.Message;
-            _loadButton.IsEnabled = false;
-        }
-        catch (HttpRequestException exception)
-        {
-            _status.Text = $"Could not connect to Plex: {exception.Message}";
-            _loadButton.IsEnabled = false;
         }
         finally
         {
@@ -208,40 +262,36 @@ internal sealed class PlexConnectionDialog : Window
     {
         if (_isBusy || _client is null ||
             _libraries.SelectedIndex < 0 ||
-            _libraries.SelectedIndex >= _sections.Count)
+            _libraries.SelectedIndex >= _sections.Count ||
+            string.IsNullOrWhiteSpace(_connectedToken))
         {
-            _status.Text = "Connect to Plex and select a music library first.";
-            return;
-        }
-
-        if (!Uri.TryCreate(_serverUrl.Text?.Trim(), UriKind.Absolute, out var serverUrl) ||
-            serverUrl != _client.Settings.ServerUrl ||
-            !string.Equals(_token.Text, _connectedToken, StringComparison.Ordinal))
-        {
-            _status.Text = "The connection details changed. Find music libraries again before loading.";
-            _loadButton.IsEnabled = false;
+            _status.Text = "Sign in to Plex and select a music library first.";
             return;
         }
 
         SetBusy(true, "Loading tracks…");
         try
         {
+            var cancellationToken = _operationCancellation?.Token ?? CancellationToken.None;
             var section = _sections[_libraries.SelectedIndex];
-            var tracks = await _client.GetTracksAsync(section.Key);
+            var tracks = await _client.GetTracksAsync(section.Key, cancellationToken);
+            var serverUrl = _client.ResolvedServerUri
+                ?? throw new PlexConnectionException("Plex did not resolve an accessible server.");
             var settings = new PlexServerSettings(serverUrl, section.Key);
-            var result = new PlexConnectionResult(settings, _connectedToken!, tracks);
+            var result = new PlexConnectionResult(settings, _connectedToken, tracks);
             _status.Text = tracks.Count == 0
                 ? "The selected music library is empty."
                 : $"Loaded {tracks.Count} track(s) from {section.Title}.";
             Close(result);
         }
+        catch (PlexAuthenticationException exception)
+        {
+            _connectedToken = null;
+            _status.Text = ClearSavedToken(exception);
+        }
         catch (PlexConnectionException exception)
         {
             _status.Text = exception.Message;
-        }
-        catch (HttpRequestException exception)
-        {
-            _status.Text = $"Could not load the Plex library: {exception.Message}";
         }
         finally
         {
@@ -252,12 +302,28 @@ internal sealed class PlexConnectionDialog : Window
     private void SetBusy(bool busy, string? status = null)
     {
         _isBusy = busy;
-        _connectButton.IsEnabled = !busy;
-        _loadButton.IsEnabled = !busy && _sections.Count > 0;
-        _cancelButton.IsEnabled = !busy;
+        _signInButton.IsEnabled = !busy;
+        _loadButton.IsEnabled =
+            !busy &&
+            _sections.Count > 0 &&
+            !string.IsNullOrWhiteSpace(_connectedToken);
+        _cancelButton.IsEnabled = true;
         if (status is not null)
         {
             _status.Text = status;
+        }
+    }
+
+    private string ClearSavedToken(PlexAuthenticationException exception)
+    {
+        try
+        {
+            _credentialStore.DeletePlexToken();
+            return $"{exception.Message} Sign in with Plex again.";
+        }
+        catch (InvalidOperationException deletionException)
+        {
+            return $"{exception.Message} Could not clear the saved Plex sign-in: {deletionException.Message}";
         }
     }
 }

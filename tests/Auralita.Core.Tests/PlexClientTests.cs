@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using Auralita.Core.Plex;
 using Xunit;
 
@@ -6,13 +7,15 @@ namespace Auralita.Core.Tests;
 
 public sealed class PlexClientTests
 {
+    private const string ClientIdentifier = "11111111-2222-4333-8444-555555555555";
+
     [Fact]
-    public async Task DirectServerLoadsOnlyMusicLibraries()
+    public async Task DirectServerLoadsOnlyMusicLibrariesWithServerAccessToken()
     {
         var handler = new StubHandler((request, _) =>
         {
             Assert.Equal("/library/sections", request.RequestUri!.AbsolutePath);
-            Assert.Equal("test-token", request.Headers.GetValues("X-Plex-Token").Single());
+            AssertPlexHeaders(request, "server-token");
             return XmlResponse("""
                 <MediaContainer>
                   <Directory key="1" title="Movies" type="movie" />
@@ -34,26 +37,27 @@ public sealed class PlexClientTests
     }
 
     [Fact]
-    public async Task PlexWebAppFindsMusicLibraryOnLaterServer()
+    public async Task PlexWebAppFindsMusicLibraryOnLaterServerAndUsesItsAccessToken()
     {
         var requests = new List<string>();
         var handler = CreateMultiServerHandler(requests);
         using var client = new PlexClient(
             new PlexServerSettings(new Uri("https://app.plex.tv"), string.Empty),
             "test-token",
+            ClientIdentifier,
             new HttpClient(handler));
 
         var libraries = await client.GetMusicLibrariesAsync();
 
         var library = Assert.Single(libraries);
         Assert.Equal(new PlexLibrarySection("2", "Remote Music"), library);
-        Assert.Contains("http://plex.local:32400/library/sections", requests);
+        Assert.Contains("https://plex.local:32400/library/sections", requests);
         Assert.Equal("https://plex.example:32400/library/sections", requests[^1]);
 
         var track = Assert.Single(await client.GetTracksAsync(library.Key));
         Assert.Equal("Remote song", track.Title);
         Assert.Equal(
-            "https://plex.example:32400/library/parts/10/file?X-Plex-Token=test-token",
+            "https://plex.example:32400/library/parts/10/file?X-Plex-Token=remote-token",
             track.Source!.AbsoluteUri);
         Assert.Equal(
             "https://plex.example:32400/library/sections/2/all?type=10",
@@ -68,6 +72,7 @@ public sealed class PlexClientTests
         using var client = new PlexClient(
             new PlexServerSettings(new Uri("https://app.plex.tv"), "2"),
             "test-token",
+            ClientIdentifier,
             new HttpClient(handler));
 
         var libraries = await client.GetMusicLibrariesAsync();
@@ -78,11 +83,99 @@ public sealed class PlexClientTests
     }
 
     [Fact]
+    public async Task ServerDiscoveryPrefersNonRelayHttpsConnections()
+    {
+        var requests = new List<string>();
+        var handler = new StubHandler((request, _) =>
+        {
+            var uri = request.RequestUri!;
+            requests.Add(uri.ToString());
+            if (uri.Host == "plex.tv")
+            {
+                Assert.Equal(
+                    "?includeHttps=1&includeRelay=1",
+                    uri.Query);
+                return JsonResponse("""
+                    [
+                      {"provides":"server","accessToken":"local-token","connections":[{"uri":"http://plex.local:32400","local":true,"relay":false}]},
+                      {"provides":"server","accessToken":"relay-token","connections":[{"uri":"https://plex.relay:32400","local":false,"relay":true}]},
+                      {"provides":"server","accessToken":"secure-token","connections":[{"uri":"https://plex.secure:32400","local":false,"relay":false}]}
+                    ]
+                    """);
+            }
+
+            AssertPlexHeaders(request, "secure-token");
+            return XmlResponse("""
+                <MediaContainer>
+                  <Directory key="7" title="Secure music" type="artist" />
+                </MediaContainer>
+                """);
+        });
+        using var client = new PlexClient(
+            new PlexServerSettings(new Uri("https://app.plex.tv"), string.Empty),
+            "test-token",
+            ClientIdentifier,
+            new HttpClient(handler));
+
+        var libraries = await client.GetMusicLibrariesAsync();
+
+        Assert.Equal(new PlexLibrarySection("7", "Secure music"), Assert.Single(libraries));
+        Assert.Contains("https://plex.secure:32400/library/sections", requests);
+        Assert.DoesNotContain(requests, request => request.Contains("plex.local"));
+        Assert.DoesNotContain(requests, request => request.Contains("plex.relay"));
+    }
+
+    [Fact]
+    public async Task SavedLocalServerFallsBackToRemoteServerWhenUnreachable()
+    {
+        var requests = new List<string>();
+        var handler = new StubHandler((request, _) =>
+        {
+            var uri = request.RequestUri!;
+            requests.Add(uri.ToString());
+            if (uri.Host == "plex.tv")
+            {
+                return JsonResponse("""
+                    [
+                      {"provides":"server","accessToken":"local-token","connections":[{"uri":"https://plex.local:32400","local":true,"relay":false}]},
+                      {"provides":"server","accessToken":"remote-token","connections":[{"uri":"https://plex.example:32400","local":false,"relay":false}]}
+                    ]
+                    """);
+            }
+
+            if (uri.Host == "plex.local")
+            {
+                return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+            }
+
+            AssertPlexHeaders(request, "remote-token");
+            return XmlResponse("""
+                <MediaContainer>
+                  <Directory key="2" title="Remote music" type="artist" />
+                </MediaContainer>
+                """);
+        });
+        using var client = new PlexClient(
+            new PlexServerSettings(new Uri("https://plex.local:32400"), "2"),
+            "test-token",
+            ClientIdentifier,
+            new HttpClient(handler));
+
+        var libraries = await client.GetMusicLibrariesAsync();
+
+        Assert.Equal(new PlexLibrarySection("2", "Remote music"), Assert.Single(libraries));
+        Assert.Equal("https://plex.example:32400/", client.ResolvedServerUri!.AbsoluteUri);
+        Assert.Contains("https://plex.local:32400/library/sections", requests);
+        Assert.Contains("https://plex.example:32400/library/sections", requests);
+    }
+
+    [Fact]
     public async Task TrackMappingIncludesMetadataAndAuthenticatedMediaUrls()
     {
         var handler = new StubHandler((request, _) =>
         {
             Assert.Equal("/library/sections/5/all", request.RequestUri!.AbsolutePath);
+            AssertPlexHeaders(request, "server-token");
             return XmlResponse("""
                 <MediaContainer>
                   <Track title="Song" grandparentTitle="Artist" parentTitle="Album" duration="183000" thumb="/library/metadata/11/thumb/1">
@@ -91,7 +184,7 @@ public sealed class PlexClientTests
                 </MediaContainer>
                 """);
         });
-        using var client = CreateClient("https://plex.local:32400", handler);
+        using var client = CreateClient("https://plex.local:32400", handler, includeDefaultLibrary: true);
 
         var tracks = await client.GetTracksAsync("5");
 
@@ -101,10 +194,10 @@ public sealed class PlexClientTests
         Assert.Equal("Album", track.Album);
         Assert.Equal(TimeSpan.FromSeconds(183), track.Duration);
         Assert.Equal(
-            "https://plex.local:32400/photo/:/transcode?url=%2Flibrary%2Fmetadata%2F11%2Fthumb%2F1&width=160&height=160&minSize=1&upscale=1&X-Plex-Token=test-token",
+            "https://plex.local:32400/photo/:/transcode?url=%2Flibrary%2Fmetadata%2F11%2Fthumb%2F1&width=160&height=160&minSize=1&upscale=1&X-Plex-Token=server-token",
             track.ArtworkUri!.AbsoluteUri);
         Assert.Equal(
-            "https://plex.local:32400/library/parts/99/file?download=1&X-Plex-Token=test-token",
+            "https://plex.local:32400/library/parts/99/file?download=1&X-Plex-Token=server-token",
             track.Source!.AbsoluteUri);
     }
 
@@ -113,6 +206,7 @@ public sealed class PlexClientTests
     {
         var handler = new StubHandler((request, _) =>
         {
+            AssertPlexHeaders(request, "server-token");
             if (request.RequestUri!.Query.Contains("type=8", StringComparison.Ordinal))
             {
                 return XmlResponse("""
@@ -128,20 +222,77 @@ public sealed class PlexClientTests
                 </MediaContainer>
                 """);
         });
-        using var client = CreateClient("https://plex.local:32400", handler);
+        using var client = CreateClient("https://plex.local:32400", handler, includeDefaultLibrary: true);
 
         var artist = Assert.Single(await client.GetArtistsAsync("5"));
         var album = Assert.Single(await client.GetAlbumsAsync("5"));
 
         Assert.Equal("Artist", artist.Name);
         Assert.Equal(
-            "https://plex.local:32400/photo/:/transcode?url=%2Fart%2Fartist&width=160&height=160&minSize=1&upscale=1&X-Plex-Token=test-token",
+            "https://plex.local:32400/photo/:/transcode?url=%2Fart%2Fartist&width=160&height=160&minSize=1&upscale=1&X-Plex-Token=server-token",
             artist.ArtworkUri!.AbsoluteUri);
         Assert.Equal("Album", album.Title);
         Assert.Equal("Artist", album.Artist);
         Assert.Equal(
-            "https://plex.local:32400/photo/:/transcode?url=%2Fart%2Falbum&width=160&height=160&minSize=1&upscale=1&X-Plex-Token=test-token",
+            "https://plex.local:32400/photo/:/transcode?url=%2Fart%2Falbum&width=160&height=160&minSize=1&upscale=1&X-Plex-Token=server-token",
             album.ArtworkUri!.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task ParsesJsonMetadataForArtistsAlbumsAndTracks()
+    {
+        var handler = new StubHandler((request, _) =>
+        {
+            var query = request.RequestUri!.Query;
+            if (query.Contains("type=8", StringComparison.Ordinal))
+            {
+                return JsonResponse("""
+                    {"MediaContainer":{"Metadata":[{"type":"artist","key":"/library/metadata/artist","title":"JSON artist"}]}}
+                    """);
+            }
+
+            if (query.Contains("type=9", StringComparison.Ordinal))
+            {
+                return JsonResponse("""
+                    {"MediaContainer":{"Metadata":[{"type":"album","key":"/library/metadata/album","title":"JSON album","parentTitle":"JSON artist"}]}}
+                    """);
+            }
+
+            return JsonResponse("""
+                {
+                  "MediaContainer": {
+                    "totalSize": 1,
+                    "Metadata": [{
+                      "type": "track",
+                      "key": "/library/metadata/track",
+                      "title": "JSON song",
+                      "grandparentTitle": "JSON artist",
+                      "parentTitle": "JSON album",
+                      "duration": 120000,
+                      "Media": [{"Part": [{"key": "/library/parts/json"}]}]
+                    }]
+                  }
+                }
+                """);
+        });
+        using var client = CreateClient(
+            "https://plex.local:32400",
+            handler,
+            includeDefaultLibrary: true);
+
+        var artist = Assert.Single(await client.GetArtistsAsync("5"));
+        var album = Assert.Single(await client.GetAlbumsAsync("5"));
+        var track = Assert.Single(await client.GetTracksAsync("5"));
+
+        Assert.Equal("JSON artist", artist.Name);
+        Assert.Equal("JSON album", album.Title);
+        Assert.Equal("JSON song", track.Title);
+        Assert.Equal("JSON artist", track.Artist);
+        Assert.Equal("JSON album", track.Album);
+        Assert.Equal(TimeSpan.FromMinutes(2), track.Duration);
+        Assert.Equal(
+            "https://plex.local:32400/library/parts/json?X-Plex-Token=server-token",
+            track.Source!.AbsoluteUri);
     }
 
     [Fact]
@@ -154,7 +305,7 @@ public sealed class PlexClientTests
               </Track>
             </MediaContainer>
             """));
-        using var client = CreateClient("https://plex.local:32400", handler);
+        using var client = CreateClient("https://plex.local:32400", handler, includeDefaultLibrary: true);
 
         var tracks = await client.GetTracksAsync("5");
 
@@ -179,7 +330,7 @@ public sealed class PlexClientTests
             new HttpResponseMessage(HttpStatusCode.Unauthorized));
         using var client = CreateClient("http://plex.local:32400", handler);
 
-        var error = await Assert.ThrowsAsync<PlexConnectionException>(
+        var error = await Assert.ThrowsAsync<PlexAuthenticationException>(
             () => client.GetMusicLibrariesAsync());
 
         Assert.Contains("authentication token", error.Message, StringComparison.OrdinalIgnoreCase);
@@ -205,14 +356,48 @@ public sealed class PlexClientTests
             new PlexClient(
                 new PlexServerSettings(new Uri("file:///tmp/plex"), "1"),
                 "test-token",
+                ClientIdentifier,
                 new HttpClient(new StubHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK)))));
     }
 
-    private static PlexClient CreateClient(string serverUrl, HttpMessageHandler handler) =>
-        new(
-            new PlexServerSettings(new Uri(serverUrl), "1"),
+    private static PlexClient CreateClient(
+        string serverUrl,
+        StubHandler handler,
+        bool includeDefaultLibrary = false)
+    {
+        var client = new HttpClient(new StubHandler((request, cancellationToken) =>
+        {
+            if (request.RequestUri!.Host == "plex.tv")
+            {
+                AssertPlexHeaders(request, "test-token");
+                return JsonResponse($$"""
+                    [{
+                      "provides": "server",
+                      "accessToken": "server-token",
+                      "connections": [{"uri": "{{serverUrl}}", "local": true, "relay": false}]
+                    }]
+                    """);
+            }
+
+            if (includeDefaultLibrary &&
+                request.RequestUri.AbsolutePath == "/library/sections")
+            {
+                AssertPlexHeaders(request, "server-token");
+                return XmlResponse("""
+                    <MediaContainer>
+                      <Directory key="1" title="Test music" type="artist" />
+                    </MediaContainer>
+                    """);
+            }
+
+            return handler.Respond(request, cancellationToken);
+        }));
+        return new PlexClient(
+            new PlexServerSettings(new Uri(serverUrl), string.Empty),
             "test-token",
-            new HttpClient(handler));
+            ClientIdentifier,
+            client);
+    }
 
     private static HttpMessageHandler CreateMultiServerHandler(List<string> requests) =>
         new StubHandler((request, _) =>
@@ -221,17 +406,26 @@ public sealed class PlexClientTests
             requests.Add(requestUri.ToString());
             if (requestUri.Host == "plex.tv")
             {
-                Assert.Equal("test-token", request.Headers.GetValues("X-Plex-Token").Single());
-                return XmlResponse("""
-                    <MediaContainer>
-                      <Device provides="server">
-                        <Connection uri="https://plex.example:32400" local="0" />
-                        <Connection uri="http://plex.local:32400" local="1" />
-                      </Device>
-                    </MediaContainer>
+                AssertPlexHeaders(request, "test-token");
+                return JsonResponse("""
+                    [
+                      {
+                        "provides": "server",
+                        "accessToken": "local-token",
+                        "connections": [{"uri": "https://plex.local:32400", "local": true, "relay": false}]
+                      },
+                      {
+                        "provides": "server",
+                        "accessToken": "remote-token",
+                        "connections": [{"uri": "https://plex.example:32400", "local": false, "relay": false}]
+                      }
+                    ]
                     """);
             }
 
+            AssertPlexHeaders(
+                request,
+                requestUri.Host == "plex.local" ? "local-token" : "remote-token");
             if (requestUri.AbsolutePath.EndsWith("/all", StringComparison.Ordinal))
             {
                 return XmlResponse("""
@@ -265,13 +459,33 @@ public sealed class PlexClientTests
             Content = new StringContent(xml)
         };
 
+    private static HttpResponseMessage JsonResponse(string json) =>
+        new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+
+    private static void AssertPlexHeaders(HttpRequestMessage request, string token)
+    {
+        Assert.Equal(token, request.Headers.GetValues("X-Plex-Token").Single());
+        Assert.Equal("Auralita", request.Headers.GetValues("X-Plex-Product").Single());
+        Assert.Equal("1.0.0", request.Headers.GetValues("X-Plex-Version").Single());
+        Assert.Equal(ClientIdentifier, request.Headers.GetValues("X-Plex-Client-Identifier").Single());
+        Assert.Contains(request.Headers.Accept, header => header.MediaType == "application/json");
+    }
+
     private sealed class StubHandler(
         Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> responseFactory)
         : HttpMessageHandler
     {
+        public HttpResponseMessage Respond(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            responseFactory(request, cancellationToken);
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken) =>
-            Task.FromResult(responseFactory(request, cancellationToken));
+            Task.FromResult(Respond(request, cancellationToken));
     }
 }

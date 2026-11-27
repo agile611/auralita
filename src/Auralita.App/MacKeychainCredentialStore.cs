@@ -35,6 +35,16 @@ internal sealed partial class MacKeychainCredentialStore : IPlexCredentialStore
         }
     }
 
+    public void DeletePlexToken()
+    {
+        EnsureMacOS();
+        var status = NativeKeychain.Delete(PlexTokenAccount);
+        if (status != 0 && status != NativeKeychain.ItemNotFoundStatus())
+        {
+            throw new InvalidOperationException($"Could not remove the Plex token from Keychain (status {status}).");
+        }
+    }
+
     private static void EnsureMacOS()
     {
         if (!OperatingSystem.IsMacOS())
@@ -50,6 +60,9 @@ internal sealed partial class MacKeychainCredentialStore : IPlexCredentialStore
 
         [LibraryImport("AuralitaAudio", EntryPoint = "auralita_keychain_set", StringMarshalling = StringMarshalling.Utf8)]
         internal static partial int Set(string account, string secret);
+
+        [LibraryImport("AuralitaAudio", EntryPoint = "auralita_keychain_delete", StringMarshalling = StringMarshalling.Utf8)]
+        internal static partial int Delete(string account);
 
         [LibraryImport("AuralitaAudio", EntryPoint = "auralita_keychain_item_not_found_status")]
         internal static partial int ItemNotFoundStatus();

@@ -5,4 +5,6 @@ public interface IPlexCredentialStore
     string? GetPlexToken();
 
     void SetPlexToken(string token);
+
+    void DeletePlexToken();
 }

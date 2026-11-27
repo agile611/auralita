@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
-using System.Xml.Linq;
+using System.Text.Json;
 using Auralita.Core.Domain;
 
 namespace Auralita.Core.Plex;
@@ -11,23 +11,34 @@ public sealed class PlexClient : IDisposable
     private const int MaxArtworkBytes = 16 * 1024 * 1024;
     private const int TrackPageSize = 200;
     private static readonly Uri PlexResourcesUri =
-        new("https://plex.tv/api/resources?includeHttps=1&includeRelay=1");
-    private static readonly XName MediaContainerName = "MediaContainer";
+        new("https://plex.tv/api/v2/resources?includeHttps=1&includeRelay=1");
     private readonly HttpClient _httpClient;
     private readonly bool _ownsHttpClient;
-    private readonly string _token;
+    private readonly string _accountToken;
+    private readonly string _clientIdentifier;
     private Uri? _activeServer;
+    private string? _activeServerToken;
     private IReadOnlyList<PlexLibrarySection>? _activeMusicLibraries;
     private bool _disposed;
 
-    public PlexClient(PlexServerSettings settings, string token, HttpClient? httpClient = null)
+    public PlexClient(
+        PlexServerSettings settings,
+        string token,
+        string clientIdentifier,
+        HttpClient? httpClient = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientIdentifier);
         ValidateServerUrl(settings.ServerUrl);
+        if (!Guid.TryParseExact(clientIdentifier, "D", out var parsedIdentifier))
+        {
+            throw new ArgumentException("Plex client identifier must be a UUID.", nameof(clientIdentifier));
+        }
 
         Settings = settings;
-        _token = token.Trim();
+        _accountToken = token.Trim();
+        _clientIdentifier = parsedIdentifier.ToString("D");
         _httpClient = httpClient ?? new HttpClient(
             new HttpClientHandler { AllowAutoRedirect = false })
         {
@@ -37,6 +48,8 @@ public sealed class PlexClient : IDisposable
     }
 
     public PlexServerSettings Settings { get; }
+
+    public Uri? ResolvedServerUri => _activeServer;
 
     public async Task<IReadOnlyList<PlexLibrarySection>> GetMusicLibrariesAsync(
         CancellationToken cancellationToken = default)
@@ -48,38 +61,42 @@ public sealed class PlexClient : IDisposable
             return _activeMusicLibraries;
         }
 
-        _activeMusicLibraries = await ReadMusicLibrariesAsync(server, cancellationToken)
+        _activeMusicLibraries = await ReadMusicLibrariesAsync(
+                server,
+                _activeServerToken ?? _accountToken,
+                cancellationToken)
             .ConfigureAwait(false);
         return _activeMusicLibraries;
     }
 
     private async Task<IReadOnlyList<PlexLibrarySection>> ReadMusicLibrariesAsync(
         Uri server,
+        string serverToken,
         CancellationToken cancellationToken)
     {
-        var xml = await GetXmlAsync(
+        var container = await GetApiResponseAsync(
             new Uri(server, "library/sections"),
+            serverToken,
             cancellationToken).ConfigureAwait(false);
-        var container = xml.Root;
-        if (container?.Name.LocalName != MediaContainerName.LocalName)
+        if (!string.Equals(container.Name, "MediaContainer", StringComparison.OrdinalIgnoreCase))
         {
             throw new PlexConnectionException("Plex returned an invalid library response.");
         }
 
-        return container.Elements()
+        return container.Children
             .Where(element =>
-                element.Name.LocalName == "Directory" &&
+                string.Equals(element.Name, "Directory", StringComparison.OrdinalIgnoreCase) &&
                 (string.Equals(
-                     (string?)element.Attribute("type"),
+                     element.Attribute("type"),
                      "music",
                      StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(
-                     (string?)element.Attribute("type"),
+                     element.Attribute("type"),
                      "artist",
                      StringComparison.OrdinalIgnoreCase)))
             .Select(element => new PlexLibrarySection(
-                (string?)element.Attribute("key") ?? string.Empty,
-                (string?)element.Attribute("title") ?? "Untitled music library"))
+                element.Attribute("key") ?? string.Empty,
+                element.Attribute("title") ?? "Untitled music library"))
             .Where(section => section.Key.Length > 0)
             .ToArray();
     }
@@ -88,18 +105,19 @@ public sealed class PlexClient : IDisposable
         string sectionKey,
         CancellationToken cancellationToken = default)
     {
-        var (server, items) = await GetDirectoryItemsAsync(
+        var (server, serverToken, items) = await GetDirectoryItemsAsync(
             sectionKey,
             "artist",
             8,
             cancellationToken).ConfigureAwait(false);
         return items
             .Select(item => new PlexArtist(
-                (string?)item.Attribute("key") ?? string.Empty,
-                (string?)item.Attribute("title") ?? "Unknown artist",
+                item.Attribute("key") ?? string.Empty,
+                item.Attribute("title") ?? "Unknown artist",
                 BuildArtworkUri(
                     server,
-                    (string?)item.Attribute("thumb"))))
+                    serverToken,
+                    item.Attribute("thumb"))))
             .Where(artist => artist.Key.Length > 0)
             .ToArray();
     }
@@ -108,20 +126,20 @@ public sealed class PlexClient : IDisposable
         string sectionKey,
         CancellationToken cancellationToken = default)
     {
-        var (server, items) = await GetDirectoryItemsAsync(
+        var (server, serverToken, items) = await GetDirectoryItemsAsync(
             sectionKey,
             "album",
             9,
             cancellationToken).ConfigureAwait(false);
         return items
             .Select(item => new PlexAlbum(
-                (string?)item.Attribute("key") ?? string.Empty,
-                (string?)item.Attribute("title") ?? "Unknown album",
-                (string?)item.Attribute("parentTitle") ?? "Unknown artist",
+                item.Attribute("key") ?? string.Empty,
+                item.Attribute("title") ?? "Unknown album",
+                item.Attribute("parentTitle") ?? "Unknown artist",
                 BuildArtworkUri(
                     server,
-                    (string?)item.Attribute("thumb")
-                    ?? (string?)item.Attribute("parentThumb"))))
+                    serverToken,
+                    item.Attribute("thumb") ?? item.Attribute("parentThumb"))))
             .Where(album => album.Key.Length > 0)
             .ToArray();
     }
@@ -134,6 +152,7 @@ public sealed class PlexClient : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(sectionKey);
 
         var server = await ResolveServerAsync(cancellationToken).ConfigureAwait(false);
+        var serverToken = _activeServerToken ?? _accountToken;
         var normalizedKey = sectionKey.Trim('/');
         if (normalizedKey.StartsWith("library/sections/", StringComparison.OrdinalIgnoreCase))
         {
@@ -147,26 +166,30 @@ public sealed class PlexClient : IDisposable
         var start = 0;
         while (true)
         {
-            var xml = await GetXmlAsync(requestUri, cancellationToken, start, TrackPageSize)
+            var root = await GetApiResponseAsync(
+                requestUri,
+                serverToken,
+                cancellationToken,
+                start,
+                TrackPageSize)
                 .ConfigureAwait(false);
-            var root = xml.Root;
-            if (root?.Name.LocalName != MediaContainerName.LocalName)
+            if (!string.Equals(root.Name, "MediaContainer", StringComparison.OrdinalIgnoreCase))
             {
                 throw new PlexConnectionException("Plex returned an invalid music library response.");
             }
 
-            var pageItems = root.Elements()
-                .Where(element => element.Name.LocalName == "Track")
+            var pageItems = root.Children
+                .Where(IsTrackElement)
                 .ToArray();
             var page = pageItems
-                .Select(element => MapTrack(element, server))
+                .Select(element => MapTrack(element, server, serverToken))
                 .Where(track => track is not null)
                 .Cast<Track>()
                 .ToArray();
             tracks.AddRange(page);
 
             var totalSize = int.TryParse(
-                (string?)root.Attribute("totalSize"),
+                root.Attribute("totalSize"),
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
                 out var parsedTotal)
@@ -194,13 +217,18 @@ public sealed class PlexClient : IDisposable
             throw new ArgumentException("Plex artwork must use HTTP or HTTPS.", nameof(artworkUri));
         }
 
+        if (!IsPlexWebApp(Settings.ServerUrl) && !SameAuthority(Settings.ServerUrl, artworkUri))
+        {
+            throw new ArgumentException("Plex artwork must come from the configured Plex server.", nameof(artworkUri));
+        }
+
         var server = await ResolveServerAsync(cancellationToken).ConfigureAwait(false);
         if (!SameAuthority(server, artworkUri))
         {
             throw new ArgumentException("Plex artwork must come from the configured Plex server.", nameof(artworkUri));
         }
 
-        using var request = CreateRequest(artworkUri);
+        using var request = CreateRequest(artworkUri, _activeServerToken ?? _accountToken);
         using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.Content.Headers.ContentLength is > MaxArtworkBytes)
         {
@@ -247,42 +275,73 @@ public sealed class PlexClient : IDisposable
             return _activeServer;
         }
 
+        // Account credentials discover servers; each server's access token authenticates its own library and media requests.
+        var resources = await GetApiResponseAsync(
+            PlexResourcesUri,
+            _accountToken,
+            cancellationToken).ConfigureAwait(false);
+        var candidates = resources.DescendantsAndSelf()
+            .Where(element =>
+                string.Equals(element.Name, "Device", StringComparison.OrdinalIgnoreCase) &&
+                element.Attribute("provides")?
+                    .Split(',', StringSplitOptions.TrimEntries)
+                    .Contains("server", StringComparer.OrdinalIgnoreCase) == true)
+            .SelectMany(device => device.Children
+                .Where(connection =>
+                    string.Equals(connection.Name, "Connection", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(connection.Name, "connections", StringComparison.OrdinalIgnoreCase))
+                .Select(connection => TryCreateServerCandidate(
+                    connection,
+                    device.Attribute("accessToken"))))
+            .Where(candidate => candidate is not null)
+            .Cast<PlexServerCandidate>()
+            .OrderBy(candidate => candidate.Relay)
+            .ThenByDescending(candidate =>
+                string.Equals(candidate.Uri.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(candidate => candidate.Local)
+            .DistinctBy(candidate => candidate.Uri)
+            .ToArray();
         if (!IsPlexWebApp(Settings.ServerUrl))
         {
-            _activeServer = EnsureTrailingSlash(Settings.ServerUrl);
-            return _activeServer;
+            var configuredServer = EnsureTrailingSlash(Settings.ServerUrl);
+            var configuredCandidates = candidates
+                .Where(candidate => SameAuthority(configuredServer, candidate.Uri))
+                .ToArray();
+            if (candidates.Length == 0)
+            {
+                candidates =
+                [
+                    new PlexServerCandidate(configuredServer, _accountToken, false, false)
+                ];
+            }
+            else if (configuredCandidates.Length == 0)
+            {
+                candidates =
+                [
+                    new PlexServerCandidate(configuredServer, _accountToken, false, false),
+                    .. candidates
+                ];
+            }
+            else
+            {
+                candidates = candidates
+                    .OrderByDescending(candidate => SameAuthority(configuredServer, candidate.Uri))
+                    .ToArray();
+            }
         }
 
-        var resources = await GetXmlAsync(PlexResourcesUri, cancellationToken).ConfigureAwait(false);
-        var candidates = resources.Descendants()
-            .Where(element =>
-                element.Name.LocalName == "Device" &&
-                ((string?)element.Attribute("provides"))?.Contains("server", StringComparison.OrdinalIgnoreCase) == true)
-            .SelectMany(device => device.Elements()
-                .Where(connection => connection.Name.LocalName == "Connection")
-                .Select(connection => new
-                {
-                    Uri = (string?)connection.Attribute("uri"),
-                    Local = string.Equals((string?)connection.Attribute("local"), "1", StringComparison.Ordinal),
-                    Relay = string.Equals((string?)connection.Attribute("relay"), "1", StringComparison.Ordinal)
-                }))
-            .Where(connection => Uri.TryCreate(connection.Uri, UriKind.Absolute, out var uri) &&
-                                 (uri.Scheme is "http" or "https") &&
-                                 string.IsNullOrEmpty(uri.UserInfo))
-            .OrderByDescending(connection => connection.Local)
-            .ThenBy(connection => connection.Relay)
-            .Select(connection => EnsureTrailingSlash(new Uri(connection.Uri!, UriKind.Absolute)))
-            .Distinct()
-            .ToArray();
-
-        Uri? firstAccessibleServer = null;
+        PlexServerCandidate? firstAccessibleServer = null;
         IReadOnlyList<PlexLibrarySection>? firstAccessibleLibraries = null;
         PlexConnectionException? lastConnectionError = null;
+        PlexAuthenticationException? lastAuthenticationError = null;
         foreach (var candidate in candidates)
         {
             try
             {
-                var libraries = await ReadMusicLibrariesAsync(candidate, cancellationToken)
+                var libraries = await ReadMusicLibrariesAsync(
+                        candidate.Uri,
+                        candidate.AccessToken,
+                        cancellationToken)
                     .ConfigureAwait(false);
                 firstAccessibleServer ??= candidate;
                 firstAccessibleLibraries ??= libraries;
@@ -303,9 +362,14 @@ public sealed class PlexClient : IDisposable
                     continue;
                 }
 
-                _activeServer = candidate;
+                _activeServer = candidate.Uri;
+                _activeServerToken = candidate.AccessToken;
                 _activeMusicLibraries = libraries;
-                return candidate;
+                return candidate.Uri;
+            }
+            catch (PlexAuthenticationException exception)
+            {
+                lastAuthenticationError = exception;
             }
             catch (PlexConnectionException exception) when (!cancellationToken.IsCancellationRequested)
             {
@@ -315,15 +379,26 @@ public sealed class PlexClient : IDisposable
 
         if (firstAccessibleServer is not null)
         {
+            if (lastAuthenticationError is not null)
+            {
+                throw lastAuthenticationError;
+            }
+
             if (!string.IsNullOrWhiteSpace(Settings.LibrarySectionKey))
             {
                 throw new PlexConnectionException(
                     "The saved Plex music library was not found on an accessible server. Reconnect and select a library again.");
             }
 
-            _activeServer = firstAccessibleServer;
+            _activeServer = firstAccessibleServer.Uri;
+            _activeServerToken = firstAccessibleServer.AccessToken;
             _activeMusicLibraries = firstAccessibleLibraries ?? [];
-            return firstAccessibleServer;
+            return firstAccessibleServer.Uri;
+        }
+
+        if (lastAuthenticationError is not null)
+        {
+            throw lastAuthenticationError;
         }
 
         if (lastConnectionError is not null)
@@ -339,7 +414,7 @@ public sealed class PlexClient : IDisposable
                 : "Plex servers were discovered, but none could be reached.");
     }
 
-    private async Task<(Uri Server, IReadOnlyList<XElement> Items)> GetDirectoryItemsAsync(
+    private async Task<(Uri Server, string ServerToken, IReadOnlyList<PlexElement> Items)> GetDirectoryItemsAsync(
         string sectionKey,
         string mediaType,
         int typeId,
@@ -349,6 +424,7 @@ public sealed class PlexClient : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(sectionKey);
 
         var server = await ResolveServerAsync(cancellationToken).ConfigureAwait(false);
+        var serverToken = _activeServerToken ?? _accountToken;
         var normalizedKey = sectionKey.Trim('/');
         if (normalizedKey.StartsWith("library/sections/", StringComparison.OrdinalIgnoreCase))
         {
@@ -358,23 +434,28 @@ public sealed class PlexClient : IDisposable
         var requestUri = new Uri(
             server,
             $"library/sections/{Uri.EscapeDataString(normalizedKey)}/all?type={typeId}");
-        var items = new List<XElement>();
+        var items = new List<PlexElement>();
         var start = 0;
         while (true)
         {
-            var xml = await GetXmlAsync(requestUri, cancellationToken, start, TrackPageSize)
+            var root = await GetApiResponseAsync(
+                    requestUri,
+                    serverToken,
+                    cancellationToken,
+                    start,
+                    TrackPageSize)
                 .ConfigureAwait(false);
-            var root = xml.Root;
-            if (root?.Name.LocalName != MediaContainerName.LocalName)
+            if (!string.Equals(root.Name, "MediaContainer", StringComparison.OrdinalIgnoreCase))
             {
                 throw new PlexConnectionException($"Plex returned an invalid {mediaType} library response.");
             }
 
-            var page = root.Elements()
+            var page = root.Children
                 .Where(element =>
-                    element.Name.LocalName == "Directory" &&
+                    (string.Equals(element.Name, "Directory", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(element.Name, "Metadata", StringComparison.OrdinalIgnoreCase)) &&
                     string.Equals(
-                        (string?)element.Attribute("type"),
+                        element.Attribute("type"),
                         mediaType,
                         StringComparison.OrdinalIgnoreCase))
                 .ToArray();
@@ -382,7 +463,7 @@ public sealed class PlexClient : IDisposable
             start += page.Length;
 
             var totalSize = int.TryParse(
-                (string?)root.Attribute("totalSize"),
+                root.Attribute("totalSize"),
                 NumberStyles.Integer,
                 CultureInfo.InvariantCulture,
                 out var parsedTotal)
@@ -390,18 +471,19 @@ public sealed class PlexClient : IDisposable
                 : (int?)null;
             if (page.Length < TrackPageSize || totalSize is null || start >= totalSize.Value)
             {
-                return (server, items);
+                return (server, serverToken, items);
             }
         }
     }
 
-    private async Task<XDocument> GetXmlAsync(
+    private async Task<PlexElement> GetApiResponseAsync(
         Uri uri,
+        string token,
         CancellationToken cancellationToken,
         int? containerStart = null,
         int? containerSize = null)
     {
-        using var request = CreateRequest(uri);
+        using var request = CreateRequest(uri, token);
         if (containerStart is not null && containerSize is not null)
         {
             request.Headers.TryAddWithoutValidation("X-Plex-Container-Start", containerStart.Value.ToString(CultureInfo.InvariantCulture));
@@ -411,14 +493,13 @@ public sealed class PlexClient : IDisposable
         using var response = await SendAsync(request, cancellationToken).ConfigureAwait(false);
         try
         {
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
+            var content = await response.Content.ReadAsStringAsync(cancellationToken)
                 .ConfigureAwait(false);
-            return await XDocument.LoadAsync(stream, LoadOptions.None, cancellationToken)
-                .ConfigureAwait(false);
+            return PlexResponseParser.Parse(content);
         }
-        catch (System.Xml.XmlException exception)
+        catch (JsonException exception)
         {
-            throw new PlexConnectionException("Plex returned malformed XML.", exception);
+            throw new PlexConnectionException("Plex returned a malformed API response.", exception);
         }
     }
 
@@ -441,12 +522,19 @@ public sealed class PlexClient : IDisposable
             response.Dispose();
             var message = statusCode switch
             {
-                HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden =>
-                    "Plex rejected the authentication token. Check the token and try again.",
+                HttpStatusCode.Unauthorized =>
+                    "Plex rejected the authentication token. Sign in again to continue.",
+                HttpStatusCode.Forbidden =>
+                    "Plex denied access to the requested resource.",
                 HttpStatusCode.NotFound =>
                     "The Plex server did not find the requested music library.",
                 _ => $"Plex returned HTTP {(int)statusCode} ({statusCode})."
             };
+            if (statusCode == HttpStatusCode.Unauthorized)
+            {
+                throw new PlexAuthenticationException(message);
+            }
+
             throw new PlexConnectionException(message);
         }
         catch (HttpRequestException exception)
@@ -459,45 +547,46 @@ public sealed class PlexClient : IDisposable
         }
     }
 
-    private HttpRequestMessage CreateRequest(Uri uri)
+    private HttpRequestMessage CreateRequest(Uri uri, string token)
     {
         var request = new HttpRequestMessage(HttpMethod.Get, uri);
-        request.Headers.TryAddWithoutValidation("X-Plex-Token", _token);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml"));
+        request.Headers.TryAddWithoutValidation("X-Plex-Token", token);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         request.Headers.TryAddWithoutValidation("X-Plex-Product", "Auralita");
-        request.Headers.TryAddWithoutValidation("X-Plex-Version", "1.0");
+        request.Headers.TryAddWithoutValidation("X-Plex-Version", "1.0.0");
+        request.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", _clientIdentifier);
         return request;
     }
 
-    private Track? MapTrack(XElement element, Uri server)
+    private Track? MapTrack(PlexElement element, Uri server, string serverToken)
     {
-        var title = (string?)element.Attribute("title");
+        var title = element.Attribute("title");
         if (string.IsNullOrWhiteSpace(title))
         {
             return null;
         }
 
         var artist = FirstNonEmpty(
-            (string?)element.Attribute("grandparentTitle"),
-            (string?)element.Attribute("artistTitle")) ?? "Unknown artist";
-        var album = FirstNonEmpty((string?)element.Attribute("parentTitle")) ?? "Unknown album";
-        var duration = ParseDuration((string?)element.Attribute("duration"));
+            element.Attribute("grandparentTitle"),
+            element.Attribute("artistTitle")) ?? "Unknown artist";
+        var album = FirstNonEmpty(element.Attribute("parentTitle")) ?? "Unknown album";
+        var duration = ParseDuration(element.Attribute("duration"));
         var artworkKey = FirstNonEmpty(
-            (string?)element.Attribute("thumb"),
-            (string?)element.Attribute("parentThumb"));
-        var artworkUri = BuildArtworkUri(server, artworkKey);
-        var partKey = element.Descendants()
-            .FirstOrDefault(part => part.Name.LocalName == "Part")
-            ?.Attribute("key")?.Value;
-        var streamKey = FirstNonEmpty(partKey, (string?)element.Attribute("key"));
-        var streamUri = BuildAuthenticatedUri(server, streamKey);
+            element.Attribute("thumb"),
+            element.Attribute("parentThumb"));
+        var artworkUri = BuildArtworkUri(server, serverToken, artworkKey);
+        var partKey = element.DescendantsAndSelf()
+            .FirstOrDefault(part => string.Equals(part.Name, "Part", StringComparison.OrdinalIgnoreCase))
+            ?.Attribute("key");
+        var streamKey = FirstNonEmpty(partKey, element.Attribute("key"));
+        var streamUri = BuildAuthenticatedUri(server, serverToken, streamKey);
 
         return streamUri is null
             ? null
             : new Track(title, artist, streamUri, album, duration, artworkUri);
     }
 
-    private Uri? BuildAuthenticatedUri(Uri server, string? key)
+    private Uri? BuildAuthenticatedUri(Uri server, string serverToken, string? key)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -519,12 +608,12 @@ public sealed class PlexClient : IDisposable
                 var name = separator >= 0 ? parameter[..separator] : parameter;
                 return !string.Equals(name, "X-Plex-Token", StringComparison.OrdinalIgnoreCase);
             });
-        var tokenQuery = $"X-Plex-Token={Uri.EscapeDataString(_token)}";
+        var tokenQuery = $"X-Plex-Token={Uri.EscapeDataString(serverToken)}";
         builder.Query = string.Join("&", existingParameters.Append(tokenQuery));
         return builder.Uri;
     }
 
-    private Uri? BuildArtworkUri(Uri server, string? key)
+    private Uri? BuildArtworkUri(Uri server, string serverToken, string? key)
     {
         var imageUri = ResolveResourceUri(server, key);
         if (imageUri is null)
@@ -535,7 +624,7 @@ public sealed class PlexClient : IDisposable
         var transcodeUri = new Uri(
             server,
             $"photo/:/transcode?url={Uri.EscapeDataString(imageUri.PathAndQuery)}&width=160&height=160&minSize=1&upscale=1");
-        return BuildAuthenticatedUri(server, transcodeUri.AbsoluteUri);
+        return BuildAuthenticatedUri(server, serverToken, transcodeUri.AbsoluteUri);
     }
 
     private static Uri? ResolveResourceUri(Uri server, string? key)
@@ -581,6 +670,35 @@ public sealed class PlexClient : IDisposable
     private static string? FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
+    private static bool IsTrackElement(PlexElement element) =>
+        string.Equals(element.Name, "Track", StringComparison.OrdinalIgnoreCase) ||
+        (string.Equals(element.Name, "Metadata", StringComparison.OrdinalIgnoreCase) &&
+         string.Equals(element.Attribute("type"), "track", StringComparison.OrdinalIgnoreCase));
+
+    private static PlexServerCandidate? TryCreateServerCandidate(
+        PlexElement connection,
+        string? accessToken)
+    {
+        var uriValue = connection.Attribute("uri");
+        if (string.IsNullOrWhiteSpace(accessToken) ||
+            !Uri.TryCreate(uriValue, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("http" or "https") ||
+            !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            return null;
+        }
+
+        return new PlexServerCandidate(
+            EnsureTrailingSlash(uri),
+            accessToken,
+            IsTruthy(connection.Attribute("local")),
+            IsTruthy(connection.Attribute("relay")));
+    }
+
+    private static bool IsTruthy(string? value) =>
+        string.Equals(value, "1", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+
     private static void ValidateServerUrl(Uri serverUrl)
     {
         ArgumentNullException.ThrowIfNull(serverUrl);
@@ -603,4 +721,10 @@ public sealed class PlexClient : IDisposable
 
     private void ThrowIfDisposed() =>
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+    private sealed record PlexServerCandidate(
+        Uri Uri,
+        string AccessToken,
+        bool Local,
+        bool Relay);
 }

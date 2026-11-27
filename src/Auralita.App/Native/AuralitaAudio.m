@@ -280,3 +280,24 @@ int32_t auralita_keychain_item_not_found_status(void)
 {
     return errSecItemNotFound;
 }
+
+int32_t auralita_keychain_delete(const char *account)
+{
+    @autoreleasepool {
+        if (account == NULL) {
+            return errSecParam;
+        }
+
+        NSString *accountValue = [NSString stringWithUTF8String:account];
+        if (accountValue == nil) {
+            return errSecParam;
+        }
+
+        NSDictionary *query = @{
+            (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+            (__bridge id)kSecAttrService: @"com.agile611.auralita",
+            (__bridge id)kSecAttrAccount: accountValue
+        };
+        return (int32_t)SecItemDelete((__bridge CFDictionaryRef)query);
+    }
+}

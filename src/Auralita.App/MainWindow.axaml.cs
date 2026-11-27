@@ -75,7 +75,9 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var client = CreatePlexClient(_plexSettings, token);
+            var clientIdentifier = await _plexSettingsStore.GetOrCreateClientIdentifierAsync(
+                _windowCancellation.Token);
+            var client = CreatePlexClient(_plexSettings, token, clientIdentifier);
             var tracks = await client.GetTracksAsync(
                 _plexSettings.LibrarySectionKey,
                 _windowCancellation.Token);
@@ -84,6 +86,10 @@ public partial class MainWindow : Window
             StatusText.Text = tracks.Count == 0
                 ? "Connected Plex library is empty."
                 : $"Loaded {tracks.Count} track(s) from Plex.";
+        }
+        catch (PlexAuthenticationException exception)
+        {
+            StatusText.Text = ClearPlexCredentials(exception);
         }
         catch (Exception exception) when (
             exception is IOException or
@@ -114,7 +120,13 @@ public partial class MainWindow : Window
         {
             var settings = await _plexSettingsStore.LoadAsync(_windowCancellation.Token);
             var token = _credentialStore.GetPlexToken();
-            var dialog = new PlexConnectionDialog(settings, token);
+            var clientIdentifier = await _plexSettingsStore.GetOrCreateClientIdentifierAsync(
+                _windowCancellation.Token);
+            var dialog = new PlexConnectionDialog(
+                settings,
+                token,
+                clientIdentifier,
+                _credentialStore);
             var result = await dialog.ShowDialog<PlexConnectionResult?>(this);
             if (result is null)
             {
@@ -124,12 +136,16 @@ public partial class MainWindow : Window
             _credentialStore.SetPlexToken(result.Token);
             await _plexSettingsStore.SaveAsync(result.Settings, _windowCancellation.Token);
             _plexSettings = result.Settings;
-            _ = CreatePlexClient(result.Settings, result.Token);
+            _ = CreatePlexClient(result.Settings, result.Token, clientIdentifier);
             AddPlexTracks(result.Tracks);
             RefreshQueue();
             StatusText.Text = result.Tracks.Count == 0
                 ? "Connected Plex library is empty."
                 : $"Added {result.Tracks.Count} Plex track(s) to the queue.";
+        }
+        catch (PlexAuthenticationException exception)
+        {
+            StatusText.Text = ClearPlexCredentials(exception);
         }
         catch (Exception exception) when (
             exception is IOException or
@@ -541,9 +557,12 @@ public partial class MainWindow : Window
             : $"{_entries.Count} tracks";
     }
 
-    private PlexClient CreatePlexClient(PlexServerSettings settings, string token)
+    private PlexClient CreatePlexClient(
+        PlexServerSettings settings,
+        string token,
+        string clientIdentifier)
     {
-        var client = new PlexClient(settings, token);
+        var client = new PlexClient(settings, token, clientIdentifier);
         _plexClients.Add(client);
         _plexClient = client;
         return client;
@@ -599,6 +618,29 @@ public partial class MainWindow : Window
         }
         catch (ObjectDisposedException)
         {
+        }
+        catch (PlexAuthenticationException exception)
+        {
+            var message = ClearPlexCredentials(exception);
+            await Dispatcher.UIThread.InvokeAsync(() => StatusText.Text = message);
+        }
+        catch (PlexConnectionException exception)
+        {
+            await Dispatcher.UIThread.InvokeAsync(
+                () => StatusText.Text = $"Could not load Plex artwork: {exception.Message}");
+        }
+    }
+
+    private string ClearPlexCredentials(PlexAuthenticationException exception)
+    {
+        try
+        {
+            _credentialStore.DeletePlexToken();
+            return $"{exception.Message} Sign in to Plex again.";
+        }
+        catch (InvalidOperationException deletionException)
+        {
+            return $"{exception.Message} Could not clear the saved Plex sign-in: {deletionException.Message}";
         }
     }
 
