@@ -127,37 +127,16 @@ public partial class MainWindow : Window
         try
         {
             _plexSettings = await _plexSettingsStore.LoadAsync(_windowCancellation.Token);
-            var token = _credentialStore.GetPlexToken();
-            if (_plexSettings is null || token is null)
-            {
-                return;
-            }
-
-            var clientIdentifier = await _plexSettingsStore.GetOrCreateClientIdentifierAsync(
-                _windowCancellation.Token);
-            var client = CreatePlexClient(_plexSettings, token, clientIdentifier);
-            var tracks = await client.GetTracksAsync(
-                _plexSettings.LibrarySectionKey,
-                _windowCancellation.Token);
-            AddPlexTracks(tracks);
-            RefreshQueue();
-            StatusText.Text = tracks.Count == 0
-                ? "Connected Plex library is empty."
-                : $"Loaded {tracks.Count} track(s) from Plex.";
-        }
-        catch (PlexAuthenticationException exception)
-        {
-            StatusText.Text = ClearPlexCredentials(exception);
+            StatusText.Text = _plexSettings is null
+                ? "Open audio files or connect to Plex to add music."
+                : "Open audio files or connect to Plex to refresh your music library.";
         }
         catch (Exception exception) when (
             exception is IOException or
             UnauthorizedAccessException or
-            InvalidOperationException or
-            PlexConnectionException or
-            DllNotFoundException or
-            EntryPointNotFoundException)
+            InvalidOperationException)
         {
-            StatusText.Text = $"Plex connection unavailable: {exception.Message}";
+            StatusText.Text = $"Saved Plex settings unavailable: {exception.Message}";
         }
         catch (OperationCanceledException) when (_windowCancellation.IsCancellationRequested)
         {
