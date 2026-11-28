@@ -7,8 +7,8 @@
     xmlns:app="clr-namespace:Auralita.App"
     xmlns:vm="clr-namespace:Auralita.App"
     Title="Auralita Music Player"
-    Width="1280"
-    Height="840"
+    Width="1100"
+    Height="750"
     MinWidth="1000"
     MinHeight="700"
     WindowStartupLocation="CenterScreen">
@@ -19,6 +19,7 @@
     <app:IntToBoolConverter x:Key="IntToBoolConverter" />
     <app:StringToBoolConverter x:Key="StringToBoolConverter" />
     <app:IntToTrackCountConverter x:Key="IntToTrackCountConverter" />
+    <app:IntToInverseConverter x:Key="IntToInverseConverter" />
     <app:TrackDetailConverter x:Key="TrackDetailConverter" />
     <app:DoubleToWidthConverter x:Key="DoubleToWidthConverter" />
     <app:RepeatModeToBrushConverter x:Key="RepeatModeToBrushConverter" />
@@ -32,7 +33,7 @@
         <NativeMenuItem.Menu>
           <NativeMenu>
             <NativeMenuItem
-                Header="Add Music…"
+                Header="Add Music..."
                 Gesture="Meta+O"
                 Click="OnMenuOpenClick" />
             <NativeMenuItemSeparator />
@@ -46,7 +47,7 @@
       <NativeMenuItem Header="_Plex">
         <NativeMenuItem.Menu>
           <NativeMenu>
-            <NativeMenuItem Header="Connect to Plex…" Click="OnMenuPlexClick" />
+            <NativeMenuItem Header="Connect to Plex..." Click="OnMenuPlexClick" />
           </NativeMenu>
         </NativeMenuItem.Menu>
       </NativeMenuItem>
@@ -97,15 +98,15 @@
       </Border.OpacityMask>
     </Border>
 
-    <!-- Main Three-Zone Layout -->
-    <Grid ColumnDefinitions="240,*,340" RowDefinitions="Auto,*,Auto">
-      <!-- ========== LEFT SIDEBAR ========== -->
+    <!-- Main Three-Zone Layout: Sidebar (240) | Content (*) | Right Panel (300) -->
+    <Grid ColumnDefinitions="240,*,300" RowDefinitions="Auto,*,Auto">
+      <!-- ========== LEFT SIDEBAR (240px) ========== -->
       <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="0"
               Classes="sidebar"
               Classes.glass="True">
-        <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="0">
-          <!-- Brand & Search -->
-          <StackPanel Margin="16,16,16,8" Spacing="12">
+        <DockPanel LastChildFill="True">
+          <!-- Top: Brand & Search -->
+          <StackPanel DockPanel.Dock="Top" Margin="16,16,16,8" Spacing="12">
             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
               <Viewbox Width="28" Height="28" Stretch="Uniform">
                 <Canvas Width="64" Height="64">
@@ -117,98 +118,18 @@
                   <Path Data="M 28,12 L 32,9 L 36,12 L 32,16 Z" Fill="#E9A08B" />
                 </Canvas>
               </Viewbox>
-              <TextBlock FontSize="20" FontWeight="Bold" Text="Auralita" />
+              <TextBlock FontSize="20" FontWeight="Bold" Text="Auralita" VerticalAlignment="Center" />
             </StackPanel>
             <TextBox x:Name="SearchBox"
                      Classes="glass"
-                     PlaceholderText="Filter library &amp; queue…"
+                     PlaceholderText="Filter library &amp; queue..."
                      Text="{Binding FilterText, Mode=TwoWay}"
                      Padding="12,8"
                      CornerRadius="10" />
           </StackPanel>
 
-          <!-- Library Navigation -->
-          <StackPanel Margin="8,4,8,8" Spacing="2">
-            <TextBlock Classes="eyebrow" Margin="12,0,0,6" Text="LIBRARY" />
-            <Button Classes="sidebar-item"
-                    Command="{Binding SidebarSectionCommand}"
-                    CommandParameter="{x:Static vm:SidebarSection.Queue}"
-                    ToolTip.Tip="Queue">
-              <StackPanel Orientation="Horizontal" Spacing="12">
-                <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                      Data="M 3,3 L 12,3 L 12,10 L 3,10 Z M 15,3 L 24,3 L 24,10 L 15,10 Z M 3,13 L 12,13 L 12,20 L 3,20 Z M 15,13 L 24,13 L 24,20 L 15,20 Z" />
-                <TextBlock Text="Queue" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Button Classes="sidebar-item"
-                    Command="{Binding SidebarSectionCommand}"
-                    CommandParameter="{x:Static vm:SidebarSection.Tracks}"
-                    ToolTip.Tip="Tracks">
-              <StackPanel Orientation="Horizontal" Spacing="12">
-                <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                      Data="M 12,2 L 22,8 L 22,22 L 12,28 L 2,22 L 2,8 Z M 12,6 L 18,10 L 18,22 L 12,26 L 6,22 L 6,10 Z" />
-                <TextBlock Text="Tracks" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Button Classes="sidebar-item"
-                    Command="{Binding SidebarSectionCommand}"
-                    CommandParameter="{x:Static vm:SidebarSection.Albums}"
-                    ToolTip.Tip="Albums">
-              <StackPanel Orientation="Horizontal" Spacing="12">
-                <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                      Data="M 4,4 L 20,4 L 20,24 L 4,24 Z M 6,6 L 18,6 L 18,14 L 6,14 Z" />
-                <TextBlock Text="Albums" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Button Classes="sidebar-item"
-                    Command="{Binding SidebarSectionCommand}"
-                    CommandParameter="{x:Static vm:SidebarSection.Artists}"
-                    ToolTip.Tip="Artists">
-              <StackPanel Orientation="Horizontal" Spacing="12">
-                <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                      Data="M 12,4 C 16.4,4 20,7.6 20,12 C 20,16.4 16.4,20 12,20 C 7.6,20 4,16.4 4,12 C 4,7.6 7.6,4 12,4 Z M 12,2 C 17.5,2 22,6.5 22,12 C 22,17.5 17.5,22 12,22 C 6.5,22 2,17.5 2,12 C 2,6.5 6.5,2 12,2 Z M 12,6 C 9.8,6 8,7.8 8,10 C 8,12.2 9.8,14 12,14 C 14.2,14 16,12.2 16,10 C 16,7.8 14.2,6 12,6 Z" />
-                <TextBlock Text="Artists" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-          </StackPanel>
-
-          <!-- Source Filters -->
-          <StackPanel Margin="8,12,8,8" Spacing="2">
-            <TextBlock Classes="eyebrow" Margin="12,0,0,6" Text="SOURCES" />
-            <Button Classes="sidebar-item"
-                    Command="{Binding SourceFilterCommand}"
-                    CommandParameter="{x:Static vm:SourceFilter.All}"
-                    ToolTip.Tip="All Sources">
-              <StackPanel Orientation="Horizontal" Spacing="12">
-                <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                      Data="M 12,2 L 22,8 L 22,22 L 12,28 L 2,22 L 2,8 Z M 12,6 L 18,10 L 18,22 L 12,26 L 6,22 L 6,10 Z" />
-                <TextBlock Text="All Sources" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Button Classes="sidebar-item"
-                    Command="{Binding SourceFilterCommand}"
-                    CommandParameter="{x:Static vm:SourceFilter.Plex}"
-                    ToolTip.Tip="Plex">
-              <StackPanel Orientation="Horizontal" Spacing="12">
-                <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                      Data="M 12,2 C 6.5,2 2,6.5 2,12 C 2,17.5 6.5,22 12,22 C 17.5,22 22,17.5 22,12 C 22,6.5 17.5,2 12,2 Z M 12,4 C 16.4,4 20,7.6 20,12 C 20,16.4 16.4,20 12,20 C 7.6,20 4,16.4 4,12 C 4,7.6 7.6,4 12,4 Z M 8,12 L 11,15 L 16,10" />
-                <TextBlock Text="Plex" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <Button Classes="sidebar-item"
-                    Command="{Binding SourceFilterCommand}"
-                    CommandParameter="{x:Static vm:SourceFilter.Local}"
-                    ToolTip.Tip="Local Audio">
-              <StackPanel Orientation="Horizontal" Spacing="12">
-                <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                      Data="M 4,4 L 20,4 L 20,24 L 4,24 Z M 6,6 L 18,6 L 18,14 L 6,14 Z M 12,18 L 12,22 M 8,18 L 8,22 M 16,18 L 16,22" />
-                <TextBlock Text="Local Audio" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-          </StackPanel>
-
-          <!-- Active Source Status & Actions -->
-          <Border Grid.Row="3" Margin="8,8,8,12" Padding="12"
+          <!-- Bottom: Status & Actions -->
+          <Border DockPanel.Dock="Bottom" Margin="12,8,12,12" Padding="12"
                   Background="{StaticResource GlassBackgroundBrush}"
                   BorderBrush="{StaticResource GlassBorderBrush}"
                   BorderThickness="1"
@@ -218,59 +139,129 @@
                 <Border Width="8" Height="8" CornerRadius="4"
                         Background="{Binding PlexConnected, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=Success}"
                         ToolTip.Tip="Plex Connected" />
-                <TextBlock Classes="caption" Text="Plex Connected" />
+                <TextBlock Classes="caption" Text="Plex Connected" VerticalAlignment="Center" />
               </StackPanel>
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Classes="accent" HorizontalAlignment="Stretch"
-                        Command="{Binding ConnectPlexCommand}"
-                        Content="Connect Plex" />
-              </StackPanel>
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button Classes="quiet" HorizontalAlignment="Stretch"
-                        Command="{Binding AddFilesCommand}"
-                        Content="Open Files" />
-              </StackPanel>
+              <Button Classes="accent" HorizontalAlignment="Stretch"
+                      Command="{Binding ConnectPlexCommand}"
+                      Content="Connect Plex" />
+              <Button Classes="quiet" HorizontalAlignment="Stretch"
+                      Command="{Binding AddFilesCommand}"
+                      Content="Open Files" />
             </StackPanel>
           </Border>
 
-          <!-- Version Info -->
-          <TextBlock Grid.Row="4" Classes="caption"
+          <!-- Version Footer -->
+          <TextBlock DockPanel.Dock="Bottom" Classes="caption"
                      HorizontalAlignment="Center"
                      Margin="0,0,0,16"
                      Text="v0.1.0" />
-        </Grid>
+
+          <!-- Middle: Library & Sources (Scrollable) -->
+          <ScrollViewer DockPanel.Dock="Top" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="8,8,8,8" Spacing="16">
+              <!-- LIBRARY Section -->
+              <StackPanel Spacing="8">
+                <TextBlock Classes="eyebrow" Margin="4,0,0,4" Text="LIBRARY" Opacity="0.6" FontSize="11" />
+                <StackPanel Spacing="4">
+                  <Button Classes="sidebar-item"
+                          Command="{Binding SidebarSectionCommand}"
+                          CommandParameter="{x:Static vm:SidebarSection.Queue}"
+                          ToolTip.Tip="Queue">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                      <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                            Data="M 3,3 L 12,3 L 12,10 L 3,10 Z M 15,3 L 24,3 L 24,10 L 15,10 Z M 3,13 L 12,13 L 12,20 L 3,20 Z M 15,13 L 24,13 L 24,20 L 15,20 Z" />
+                      <TextBlock Text="Queue" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="sidebar-item"
+                          Command="{Binding SidebarSectionCommand}"
+                          CommandParameter="{x:Static vm:SidebarSection.Tracks}"
+                          ToolTip.Tip="Tracks">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                      <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                            Data="M 12,2 L 22,8 L 22,22 L 12,28 L 2,22 L 2,8 Z M 12,6 L 18,10 L 18,22 L 12,26 L 6,22 L 6,10 Z" />
+                      <TextBlock Text="Tracks" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="sidebar-item"
+                          Command="{Binding SidebarSectionCommand}"
+                          CommandParameter="{x:Static vm:SidebarSection.Albums}"
+                          ToolTip.Tip="Albums">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                      <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                            Data="M 4,4 L 20,4 L 20,24 L 4,24 Z M 6,6 L 18,6 L 18,14 L 6,14 Z" />
+                      <TextBlock Text="Albums" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="sidebar-item"
+                          Command="{Binding SidebarSectionCommand}"
+                          CommandParameter="{x:Static vm:SidebarSection.Artists}"
+                          ToolTip.Tip="Artists">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                      <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                            Data="M 12,4 C 16.4,4 20,7.6 20,12 C 20,16.4 16.4,20 12,20 C 7.6,20 4,16.4 4,12 C 4,7.6 7.6,4 12,4 Z M 12,2 C 17.5,2 22,6.5 22,12 C 22,17.5 17.5,22 12,22 C 6.5,22 2,17.5 2,12 C 2,6.5 6.5,2 12,2 Z M 12,6 C 9.8,6 8,7.8 8,10 C 8,12.2 9.8,14 12,14 C 14.2,14 16,12.2 16,10 C 16,7.8 14.2,6 12,6 Z" />
+                      <TextBlock Text="Artists" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+              </StackPanel>
+
+              <!-- SOURCES Section -->
+              <StackPanel Spacing="8" Margin="0,8,0,0">
+                <TextBlock Classes="eyebrow" Margin="4,0,0,4" Text="SOURCES" Opacity="0.6" FontSize="11" />
+                <StackPanel Spacing="4">
+                  <Button Classes="sidebar-item"
+                          Command="{Binding SourceFilterCommand}"
+                          CommandParameter="{x:Static vm:SourceFilter.All}"
+                          ToolTip.Tip="All Sources">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                      <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                            Data="M 12,2 L 22,8 L 22,22 L 12,28 L 2,22 L 2,8 Z M 12,6 L 18,10 L 18,22 L 12,26 L 6,22 L 6,10 Z" />
+                      <TextBlock Text="All Sources" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="sidebar-item"
+                          Command="{Binding SourceFilterCommand}"
+                          CommandParameter="{x:Static vm:SourceFilter.Plex}"
+                          ToolTip.Tip="Plex">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                      <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                            Data="M 12,2 C 6.5,2 2,6.5 2,12 C 2,17.5 6.5,22 12,22 C 17.5,22 22,17.5 22,12 C 22,6.5 17.5,2 12,2 Z M 12,4 C 16.4,4 20,7.6 20,12 C 20,16.4 16.4,20 12,20 C 7.6,20 4,16.4 4,12 C 4,7.6 7.6,4 12,4 Z M 8,12 L 11,15 L 16,10" />
+                      <TextBlock Text="Plex" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="sidebar-item"
+                          Command="{Binding SourceFilterCommand}"
+                          CommandParameter="{x:Static vm:SourceFilter.Local}"
+                          ToolTip.Tip="Local Audio">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                      <Path Width="20" Height="20" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                            Data="M 4,4 L 20,4 L 20,24 L 4,24 Z M 6,6 L 18,6 L 18,14 L 6,14 Z M 12,18 L 12,22 M 8,18 L 8,22 M 16,18 L 16,22" />
+                      <TextBlock Text="Local Audio" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
       </Border>
 
-      <!-- ========== TOP TRANSPORT BAR ========== -->
+      <!-- ========== TOP TRANSPORT BAR (Height=64) ========== -->
       <Border Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
               Classes="glass glass-thin"
-              Margin="0,0,0,0"
-              Padding="8,6"
-              VerticalAlignment="Top">
-        <Grid ColumnDefinitions="*,Auto,*" ColumnSpacing="24">
-          <!-- Left: Window Controls (macOS style) -->
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
-            <Button Classes="icon" ToolTip.Tip="Close" Click="OnCloseClick">
-              <Path Width="12" Height="12" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}"
-                    Data="M 4,4 L 12,12 M 12,4 L 4,12" />
-            </Button>
-            <Button Classes="icon" ToolTip.Tip="Minimize" Click="OnMinimizeClick">
-              <Path Width="12" Height="12" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}"
-                    Data="M 4,8 L 12,8" />
-            </Button>
-            <Button Classes="icon" ToolTip.Tip="Zoom" Click="OnZoomClick">
-              <Path Width="12" Height="12" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}"
-                    Data="M 4,4 L 12,4 L 12,12 L 4,12 Z M 6,6 L 10,6 L 10,10 L 6,10 Z" />
-            </Button>
-          </StackPanel>
-
-          <!-- Center: Playback Cluster + LCD Now Playing Pill -->
-          <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" VerticalAlignment="Center">
+              Height="64"
+              VerticalAlignment="Top"
+              Margin="0,0,0,0">
+        <Grid ColumnDefinitions="260,*,280">
+          <!-- Left: Transport Controls -->
+          <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
             <!-- Shuffle -->
             <Button Classes="icon transport"
                     Command="{Binding ShuffleCommand}"
                     IsEnabled="{Binding QueueCount, Converter={StaticResource IntToBoolConverter}}"
-                    ToolTip.Tip="Shuffle">
+                    ToolTip.Tip="Shuffle"
+                    Width="36" Height="36">
               <Path Width="16" Height="16" Stretch="Uniform"
                     Fill="{Binding IsShuffle, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=Shuffle}"
                     Data="M 2,2 L 8,2 L 8,8 L 2,8 Z M 10,10 L 16,10 L 16,16 L 10,16 Z M 2,10 L 8,10 L 8,16 L 2,16 Z M 10,2 L 16,2 L 16,8 L 10,8 Z M 5,5 L 11,11 M 11,5 L 5,11" />
@@ -279,24 +270,27 @@
             <!-- Previous -->
             <Button Classes="transport"
                     Command="{Binding PreviousCommand}"
-                    ToolTip.Tip="Previous">
+                    ToolTip.Tip="Previous"
+                    Width="38" Height="38">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{StaticResource TextPrimaryBrush}"
                     Data="M 10,2 L 18,8 L 10,14 Z M 2,2 L 8,8 L 2,14 Z" />
             </Button>
 
-            <!-- Play/Pause Toggle -->
+            <!-- Play / Pause (Primary) -->
             <Button Classes="transport transport-play"
                     Command="{Binding TogglePlayPauseCommand}"
-                    ToolTip.Tip="{Binding IsPlaying, Converter={StaticResource BoolToStringConverter}, ConverterParameter=PlayPause}">
-              <Path Width="20" Height="20" Stretch="Uniform"
-                    Fill="{Binding IsPlaying, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=PlayPause}"
+                    ToolTip.Tip="{Binding IsPlaying, Converter={StaticResource BoolToStringConverter}, ConverterParameter=PlayPause}"
+                    Width="44" Height="44">
+              <Path Width="18" Height="18" Stretch="Uniform"
+                    Fill="#18141E"
                     Data="{Binding IsPlaying, Converter={StaticResource BoolToStringConverter}, ConverterParameter=PlayPausePath}" />
             </Button>
 
             <!-- Next -->
             <Button Classes="transport"
                     Command="{Binding NextCommand}"
-                    ToolTip.Tip="Next">
+                    ToolTip.Tip="Next"
+                    Width="38" Height="38">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{StaticResource TextPrimaryBrush}"
                     Data="M 2,2 L 10,8 L 2,14 Z M 14,2 L 22,8 L 14,14 Z" />
             </Button>
@@ -304,100 +298,85 @@
             <!-- Repeat -->
             <Button Classes="icon transport"
                     Command="{Binding RepeatCommand}"
-                    ToolTip.Tip="{Binding RepeatMode, Converter={StaticResource RepeatModeToTooltipConverter}}">
+                    ToolTip.Tip="{Binding RepeatMode, Converter={StaticResource RepeatModeToTooltipConverter}}"
+                    Width="36" Height="36">
               <Path Width="16" Height="16" Stretch="Uniform"
                     Fill="{Binding RepeatMode, Converter={StaticResource RepeatModeToBrushConverter}}"
                     Data="{Binding RepeatMode, Converter={StaticResource RepeatModeToPathConverter}}" />
             </Button>
           </StackPanel>
 
-          <!-- Right: LCD Now Playing Pill + Utilities -->
-          <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" VerticalAlignment="Center" Margin="0,0,12,0">
-            <!-- LCD Now Playing Pill -->
-            <Border Classes="lcd-pill" MinWidth="280" MaxWidth="400">
-              <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12" VerticalAlignment="Center">
-                <!-- Track Artwork -->
-                <Border Width="36" Height="36" CornerRadius="6" ClipToBounds="True"
-                        Background="{StaticResource SurfaceRaisedBrush}">
-                  <Image Source="{Binding ActiveTrackArtwork}" Stretch="UniformToFill" />
-                </Border>
+          <!-- Center: LCD Now Playing Capsule -->
+          <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                  MaxWidth="440" Height="44" CornerRadius="8"
+                  Background="{StaticResource LCDBackgroundBrush}"
+                  BorderBrush="{StaticResource LCDBorderBrush}"
+                  BorderThickness="1"
+                  Padding="8,4">
+            <Grid ColumnDefinitions="36,*,Auto" ColumnSpacing="10" VerticalAlignment="Center">
+              <!-- Track Artwork (32x32) -->
+              <Border Grid.Column="0" Width="32" Height="32" CornerRadius="6" ClipToBounds="True"
+                      Background="{StaticResource SurfaceRaisedBrush}">
+                <Image Source="{Binding ActiveTrackArtwork}" Stretch="UniformToFill" />
+              </Border>
 
-                <!-- Track Info -->
-                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" MinWidth="0">
-                  <StackPanel Spacing="1" MinWidth="0">
-                    <TextBlock Text="{Binding ActiveTrackTitle}"
-                               FontWeight="SemiBold"
-                               FontSize="13"
-                               TextTrimming="CharacterEllipsis"
-                               MaxWidth="220" />
-                    <TextBlock Text="{Binding ActiveTrackArtist, Converter={StaticResource TrackDetailConverter}, ConverterParameter=Artist}"
-                               Classes="caption"
-                               TextTrimming="CharacterEllipsis"
-                               MaxWidth="220" />
-                  </StackPanel>
-                </StackPanel>
+              <!-- Track Info -->
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2" MinWidth="0">
+                <TextBlock Text="{Binding ActiveTrackTitle}"
+                           FontWeight="SemiBold"
+                           FontSize="13"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="280" />
+                <TextBlock Text="{Binding ActiveTrackArtist, Converter={StaticResource TrackDetailConverter}, ConverterParameter=Artist}"
+                           Classes="caption"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="280" />
+              </StackPanel>
 
-                <!-- Scrub Bar (integrated in LCD) -->
-                <Grid Grid.Column="2" MinWidth="120" MaxWidth="200" VerticalAlignment="Center">
-                  <Grid RowDefinitions="Auto,Auto" RowSpacing="2">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="6">
-                      <TextBlock Text="{Binding ElapsedTimeText}" Classes="mono lcd" FontSize="10" />
-                      <Border Height="3" VerticalAlignment="Center"
-                              Background="{StaticResource PlayerTrackBrush}"
-                              CornerRadius="1.5">
-                        <Border Width="{Binding ProgressFraction, Converter={StaticResource DoubleToWidthConverter}, ConverterParameter=180}"
-                                Height="3" HorizontalAlignment="Left"
-                                Background="{StaticResource AccentBrush}"
-                                CornerRadius="1.5" />
-                      </Border>
-                      <TextBlock Text="{Binding RemainingTimeText}" Classes="mono lcd" FontSize="10" />
-                    </Grid>
-                  </Grid>
-                </Grid>
-
-                <!-- Favorite / More -->
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <Button Classes="icon" ToolTip.Tip="Add to favorites" Width="28" Height="28" Padding="0">
-                    <Path Width="14" Height="14" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}"
-                          Data="M 12,2 L 15,8 L 22,8 L 17,12 L 19,19 L 12,15 L 5,19 L 7,12 L 2,8 L 9,8 Z" />
-                  </Button>
-                  <Button Classes="icon" ToolTip.Tip="More options" Width="28" Height="28" Padding="0">
-                    <Path Width="14" Height="14" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}"
-                          Data="M 6,6 L 6,10 M 12,6 L 12,10 M 18,6 L 18,10" />
-                  </Button>
-                </StackPanel>
+              <!-- Scrub Bar with timestamps -->
+              <Grid Grid.Column="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" VerticalAlignment="Center" MinWidth="180">
+                <TextBlock Grid.Column="0" Text="{Binding ElapsedTimeText}" Classes="mono lcd" FontSize="11" VerticalAlignment="Center" />
+                <Slider Grid.Column="1" Minimum="0" Maximum="1"
+                        Value="{Binding ProgressFraction, Mode=TwoWay}"
+                        VerticalAlignment="Center"
+                        MinWidth="100" MaxWidth="200" />
+                <TextBlock Grid.Column="2" Text="{Binding RemainingTimeText}" Classes="mono lcd" FontSize="11" VerticalAlignment="Center" />
               </Grid>
-            </Border>
+            </Grid>
+          </Border>
 
-            <!-- Volume -->
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-              <Button Classes="icon"
-                      Command="{Binding MuteCommand}"
-                      ToolTip.Tip="{Binding IsMuted, Converter={StaticResource BoolToStringConverter}, ConverterParameter=MutePath}">
-                <Path Width="18" Height="18" Stretch="Uniform" Fill="{StaticResource TextPrimaryBrush}"
-                      Data="{Binding IsMuted, Converter={StaticResource BoolToStringConverter}, ConverterParameter=MutePath}" />
-              </Button>
-              <Slider Minimum="0" Maximum="1"
-                      Value="{Binding Volume, Mode=TwoWay}"
-                      Width="100"
-                      IsEnabled="{Binding IsMuted, Converter={StaticResource BoolToInverseConverter}}" />
-            </StackPanel>
-
+          <!-- Right: Volume + Queue/Lyrics Toggles -->
+          <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="10" Margin="0,0,16,0">
+            <!-- Mute -->
+            <Button Classes="icon"
+                    Command="{Binding MuteCommand}"
+                    ToolTip.Tip="{Binding IsMuted, Converter={StaticResource BoolToStringConverter}, ConverterParameter=MutePath}"
+                    Width="36" Height="36">
+              <Path Width="18" Height="18" Stretch="Uniform" Fill="{StaticResource TextPrimaryBrush}"
+                    Data="{Binding IsMuted, Converter={StaticResource BoolToStringConverter}, ConverterParameter=MutePath}" />
+            </Button>
+            <!-- Volume Slider -->
+            <Slider Minimum="0" Maximum="1"
+                    Value="{Binding Volume, Mode=TwoWay}"
+                    Width="90"
+                    VerticalAlignment="Center"
+                    IsEnabled="{Binding IsMuted, Converter={StaticResource BoolToInverseConverter}}" />
             <!-- Lyrics Toggle -->
             <Button Classes="icon"
                     Command="{Binding ToggleLyricsCommand}"
                     ToolTip.Tip="Lyrics"
-                    IsEnabled="{Binding HasActiveTrack}">
+                    IsEnabled="{Binding HasActiveTrack}"
+                    Width="36" Height="36">
               <Path Width="18" Height="18" Stretch="Uniform"
                     Fill="{Binding IsLyricsVisible, Converter={StaticResource BoolToBrushConverter}}"
                     Data="M 4,4 L 20,4 L 20,12 L 4,12 Z M 4,16 L 20,16 L 20,24 L 4,24 Z M 8,7 L 16,7 M 8,11 L 12,11 M 8,19 L 16,19 M 8,23 L 12,23" />
             </Button>
-
             <!-- Queue Drawer Toggle -->
             <Button Classes="icon"
                     Command="{Binding ToggleQueueCommand}"
                     ToolTip.Tip="Playing Next"
-                    IsEnabled="{Binding QueueCount, Converter={StaticResource IntToBoolConverter}}">
+                    IsEnabled="{Binding QueueCount, Converter={StaticResource IntToBoolConverter}}"
+                    Width="36" Height="36">
               <Path Width="18" Height="18" Stretch="Uniform"
                     Fill="{Binding IsQueueVisible, Converter={StaticResource BoolToBrushConverter}}"
                     Data="M 3,3 L 12,3 L 12,10 L 3,10 Z M 15,3 L 24,3 L 24,10 L 15,10 Z M 3,13 L 12,13 L 12,20 L 3,20 Z M 15,13 L 24,13 L 24,20 L 15,20 Z" />
@@ -408,7 +387,7 @@
 
       <!-- ========== MAIN CONTENT CANVAS ========== -->
       <Border Grid.Row="1" Grid.Column="1"
-              Margin="16,16,8,16"
+              Margin="16,8,8,16"
               Background="{StaticResource SurfaceBrush}"
               BorderBrush="{StaticResource BorderBrush}"
               BorderThickness="1"
@@ -500,8 +479,8 @@
                                  Text="{Binding QualityLabel}" />
                     </Border>
 
-                    <!-- Actions -->
-                    <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="False">
+                    <!-- Actions (hidden by default, show on hover via ListBoxItem style) -->
+                    <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center" Opacity="0">
                       <Button Classes="icon" ToolTip.Tip="Play Next" Width="28" Height="28" Padding="0">
                         <Path Width="14" Height="14" Stretch="Uniform" Fill="{StaticResource TextSecondaryBrush}"
                               Data="M 4,4 L 12,8 L 4,12 Z M 14,4 L 22,8 L 14,12 Z" />
@@ -540,6 +519,9 @@
                 <Style Selector="ListBoxItem:pointerover /template/ Border#PART_Border">
                   <Setter Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
                 </Style>
+                <Style Selector="ListBoxItem:pointerover StackPanel">
+                  <Setter Property="Opacity" Value="1" />
+                </Style>
                 <Style Selector="ListBoxItem:selected /template/ Border#PART_Border">
                   <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
                 </Style>
@@ -553,7 +535,7 @@
                       HorizontalAlignment="Center"
                       VerticalAlignment="Center"
                       Spacing="16"
-                      IsVisible="False">
+                      IsVisible="{Binding QueueCount, Converter={StaticResource IntToInverseConverter}}">
             <Viewbox Width="64" Height="64" Stretch="Uniform">
               <Canvas Width="64" Height="64">
                 <Path Data="M 25,5 L 39,5 L 49,23 L 32,60 L 15,23 Z" Fill="#65459B" />
@@ -572,9 +554,9 @@
         </Grid>
       </Border>
 
-      <!-- ========== RIGHT PANEL: NOW PLAYING / PLAYING NEXT / LYRICS ========== -->
+      <!-- ========== RIGHT PANEL (300px): NOW PLAYING / PLAYING NEXT / LYRICS ========== -->
       <Border Grid.Row="1" Grid.Column="2"
-              Margin="8,16,16,16"
+              Margin="8,8,16,16"
               Classes="glass"
               Padding="0">
         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="0">
@@ -616,105 +598,71 @@
           <!-- Panel Content -->
           <Grid Grid.Row="1" Margin="12,12,12,0">
             <!-- Now Playing View -->
-            <StackPanel x:Name="NowPlayingPanel" Spacing="16">
-              <!-- Artwork Card -->
-              <Border Classes="nowplaying-card" Padding="24">
-                <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="16" HorizontalAlignment="Center">
-                  <Border Width="280" Height="280" CornerRadius="12" ClipToBounds="True"
-                          Background="{StaticResource SurfaceRaisedBrush}"
-                          BoxShadow="0 16 48 -16 {StaticResource GlassShadowBrush}">
-                    <Image Source="{Binding ActiveTrackArtwork}" Stretch="UniformToFill" />
-                  </Border>
-
-                  <StackPanel Spacing="8" HorizontalAlignment="Center" >
-                    <TextBlock Text="{Binding ActiveTrackTitle}"
-                               FontSize="28"
-                               FontWeight="Bold"
-                               TextTrimming="CharacterEllipsis"
-                               MaxWidth="320" />
-                    <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                      <Button Classes="quiet"
-                              Content="{Binding ActiveTrackArtist, Converter={StaticResource TrackDetailConverter}, ConverterParameter=Artist}"
-                              FontSize="14"
-                              Foreground="{StaticResource TextSecondaryBrush}" />
-                      <TextBlock Classes="caption" Text="·" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                      <Button Classes="quiet"
-                              Content="{Binding ActiveTrackAlbum, Converter={StaticResource TrackDetailConverter}, ConverterParameter=Album}"
-                              FontSize="14"
-                              Foreground="{StaticResource TextSecondaryBrush}" />
-                    </StackPanel>
-                  </StackPanel>
-
-                  <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                    <Border Classes="badge"
-                            IsVisible="{Binding ActiveTrackQuality, Converter={StaticResource StringToBoolConverter}}">
-                      <TextBlock Classes="caption" FontSize="11" FontWeight="SemiBold"
-                                 Text="{Binding ActiveTrackQuality}" />
-                    </Border>
-                    <Border Classes="badge success"
-                            IsVisible="{Binding IsPlaying}">
-                      <TextBlock Classes="caption" FontSize="11" FontWeight="SemiBold"
-                                 Text="Playing" />
-                    </Border>
-                    <Border Classes="badge warning"
-                            IsVisible="{Binding IsPaused}">
-                      <TextBlock Classes="caption" FontSize="11" FontWeight="SemiBold"
-                                 Text="Paused" />
-                    </Border>
-                  </StackPanel>
-
-                  <!-- Playback Controls in Now Playing -->
-                  <StackPanel Orientation="Horizontal" Spacing="20" HorizontalAlignment="Center">
-                    <Button Classes="transport"
-                            Command="{Binding ShuffleCommand}"
-                            ToolTip.Tip="Shuffle">
-                      <Path Width="20" Height="20" Stretch="Uniform"
-                            Fill="{Binding IsShuffle, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=Shuffle}"
-                            Data="M 2,2 L 8,2 L 8,8 L 2,8 Z M 10,10 L 16,10 L 16,16 L 10,16 Z M 2,10 L 8,10 L 8,16 L 2,16 Z M 10,2 L 16,2 L 16,8 L 10,8 Z M 5,5 L 11,11 M 11,5 L 5,11" />
-                    </Button>
-                    <Button Classes="transport"
-                            Command="{Binding PreviousCommand}"
-                            ToolTip.Tip="Previous">
-                      <Path Width="22" Height="22" Stretch="Uniform" Fill="{StaticResource TextPrimaryBrush}"
-                            Data="M 10,2 L 18,8 L 10,14 Z M 2,2 L 8,8 L 2,14 Z" />
-                    </Button>
-                    <Button Classes="transport transport-play"
-                            Command="{Binding TogglePlayPauseCommand}"
-                            ToolTip.Tip="{Binding IsPlaying, Converter={StaticResource BoolToStringConverter}, ConverterParameter=PlayPause}">
-                      <Path Width="28" Height="28" Stretch="Uniform"
-                            Fill="{Binding IsPlaying, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=PlayPause}"
-                            Data="{Binding IsPlaying, Converter={StaticResource BoolToStringConverter}, ConverterParameter=PlayPausePathLarge}" />
-                    </Button>
-                    <Button Classes="transport"
-                            Command="{Binding NextCommand}"
-                            ToolTip.Tip="Next">
-                      <Path Width="22" Height="22" Stretch="Uniform" Fill="{StaticResource TextPrimaryBrush}"
-                            Data="M 2,2 L 10,8 L 2,14 Z M 14,2 L 22,8 L 14,14 Z" />
-                    </Button>
-                    <Button Classes="transport"
-                            Command="{Binding RepeatCommand}"
-                            ToolTip.Tip="{Binding RepeatMode, Converter={StaticResource RepeatModeToTooltipConverter}}">
-                      <Path Width="20" Height="20" Stretch="Uniform"
-                            Fill="{Binding RepeatMode, Converter={StaticResource RepeatModeToBrushConverter}}"
-                            Data="{Binding RepeatMode, Converter={StaticResource RepeatModeToPathConverter}}" />
-                    </Button>
-                  </StackPanel>
+            <StackPanel x:Name="NowPlayingPanel" Spacing="14" Margin="8,8,8,0">
+              <!-- Artwork Card (1:1 Square, 240x240) -->
+              <Border Width="240" Height="240" CornerRadius="12" ClipToBounds="True"
+                      Background="{StaticResource SurfaceRaisedBrush}"
+                      HorizontalAlignment="Center"
+                      BoxShadow="0 16 48 -16 #33000000">
+                <Grid>
+                  <Image Source="{Binding ActiveTrackArtwork}" Stretch="UniformToFill" />
+                  <!-- Placeholder when no artwork -->
+                  <Viewbox Width="80" Height="80" Stretch="Uniform" IsVisible="{Binding ActiveTrackArtwork, Converter={StaticResource BoolToInverseConverter}}">
+                    <Canvas Width="64" Height="64">
+                      <Path Data="M 25,5 L 39,5 L 49,23 L 32,60 L 15,23 Z" Fill="#65459B" Stroke="#35234F" StrokeThickness="1.5" />
+                      <Path Data="M 25,5 L 32,23 L 15,23 Z" Fill="#B49ADA" />
+                      <Path Data="M 39,5 L 32,23 L 49,23 Z" Fill="#8B6ABD" />
+                      <Path Data="M 15,23 L 32,23 L 32,60 Z" Fill="#7756AA" />
+                      <Path Data="M 32,23 L 49,23 L 32,60 Z" Fill="#50367F" />
+                      <Path Data="M 28,12 L 32,9 L 36,12 L 32,16 Z" Fill="#E9A08B" />
+                    </Canvas>
+                  </Viewbox>
                 </Grid>
               </Border>
 
-              <!-- Progress Bar -->
-              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" VerticalAlignment="Center">
-                <TextBlock Text="{Binding ElapsedTimeText}" Classes="mono lcd" FontSize="12" />
-                <Border Height="4" VerticalAlignment="Center"
-                        Background="{StaticResource PlayerTrackBrush}"
-                        CornerRadius="2">
-                  <Border Width="{Binding ProgressFraction, Converter={StaticResource DoubleToWidthConverter}, ConverterParameter=300}"
-                          Height="4" HorizontalAlignment="Left"
-                          Background="{StaticResource AccentBrush}"
-                          CornerRadius="2" />
+              <!-- Track Metadata -->
+              <StackPanel Spacing="6" HorizontalAlignment="Center" >
+                <TextBlock Text="{Binding ActiveTrackTitle}"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           MaxWidth="280" />
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                  <Button Classes="quiet"
+                          Content="{Binding ActiveTrackArtist, Converter={StaticResource TrackDetailConverter}, ConverterParameter=Artist}"
+                          FontSize="13"
+                          Foreground="{StaticResource TextSecondaryBrush}" />
+                  <TextBlock Classes="caption" Text="·" Foreground="{StaticResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                  <Button Classes="quiet"
+                          Content="{Binding ActiveTrackAlbum, Converter={StaticResource TrackDetailConverter}, ConverterParameter=Album}"
+                          FontSize="13"
+                          Foreground="{StaticResource TextSecondaryBrush}" />
+                </StackPanel>
+              </StackPanel>
+
+              <!-- Status Badge -->
+              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                <Border Classes="badge"
+                        IsVisible="{Binding ActiveTrackQuality, Converter={StaticResource StringToBoolConverter}}">
+                  <TextBlock Classes="caption" FontSize="11" FontWeight="SemiBold"
+                             Text="{Binding ActiveTrackQuality}" />
                 </Border>
-                <TextBlock Text="{Binding RemainingTimeText}" Classes="mono lcd" FontSize="12" />
-              </Grid>
+                <Border Classes="badge success"
+                        IsVisible="{Binding IsPlaying}">
+                  <TextBlock Classes="caption" FontSize="11" FontWeight="SemiBold"
+                             Text="Playing" />
+                </Border>
+                <Border Classes="badge warning"
+                        IsVisible="{Binding IsPaused}">
+                  <TextBlock Classes="caption" FontSize="11" FontWeight="SemiBold"
+                             Text="Paused" />
+                </Border>
+                <Border Classes="badge"
+                        IsVisible="{Binding HasActiveTrack, Converter={StaticResource BoolToInverseConverter}}">
+                  <TextBlock Classes="caption" FontSize="11" FontWeight="SemiBold"
+                             Text="Ready" />
+                </Border>
+              </StackPanel>
             </StackPanel>
 
             <!-- Playing Next View -->

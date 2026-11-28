@@ -102,7 +102,7 @@
       <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{StaticResource RadiusLarge}" />
-      <Setter Property="BoxShadow" Value="0 4 24 -8 {StaticResource GlassShadowBrush}" />
+      <Setter Property="BoxShadow" Value="0 4 24 -8 #33000000" />
     </Style>
     <Style Selector="Border.glass-thin">
       <Setter Property="Background" Value="{StaticResource GlassBackgroundBrush}" />
@@ -335,7 +335,7 @@
       <Setter Property="BorderBrush" Value="{StaticResource NowPlayingCardBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{StaticResource RadiusCard}" />
-      <Setter Property="BoxShadow" Value="0 8 32 -12 {StaticResource GlassShadowBrush}" />
+      <Setter Property="BoxShadow" Value="0 8 32 -12 #33000000" />
     </Style>
 
     <!-- ScrollViewer -->

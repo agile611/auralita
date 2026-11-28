@@ -135,6 +135,7 @@ internal sealed class IntToBoolConverter : IValueConverter
         => throw new NotSupportedException();
 }
 
+
 internal sealed class StringToBoolConverter : IValueConverter
 {
     public StringToBoolConverter() { }
@@ -142,6 +143,23 @@ internal sealed class StringToBoolConverter : IValueConverter
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         return !string.IsNullOrWhiteSpace(value as string);
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+}
+
+internal sealed class IntToInverseConverter : IValueConverter
+{
+    public IntToInverseConverter() { }
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is int i)
+        {
+            return i == 0;
+        }
+        return true;
     }
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
