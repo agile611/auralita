@@ -25,6 +25,25 @@
     <app:RepeatModeToBrushConverter x:Key="RepeatModeToBrushConverter" />
     <app:RepeatModeToPathConverter x:Key="RepeatModeToPathConverter" />
     <app:RepeatModeToTooltipConverter x:Key="RepeatModeToTooltipConverter" />
+    <!-- Transport Icon Geometries -->
+    <PathGeometry x:Key="PlayGeometry">M8 5.5v13l10-6.5z</PathGeometry>
+    <PathGeometry x:Key="PauseGeometry">M7 5h3v14H7zm7 0h3v14h-3z</PathGeometry>
+    <PathGeometry x:Key="NextGeometry">M6 5l8.5 7L6 19zm10 0h2v14h-2z</PathGeometry>
+    <PathGeometry x:Key="PreviousGeometry">M14 5h-2v14h2zM6 5l8.5 7L6 19z</PathGeometry>
+    <PathGeometry x:Key="ShuffleGeometry">M12 2v6h6v10h-6v-10zM12 22v-6h6v-10h-6zM2 12h20v2H2z</PathGeometry>
+    <PathGeometry x:Key="RepeatGeometry">M12 2v6h6v10h-6v-10zM12 22v-6h6v-10h-6zM2 12h20v2H2z</PathGeometry>
+    <PathGeometry x:Key="MuteGeometry">M16 4h8v2h-8zM4 12h16v2H4zM12 20h4v4h-4z</PathGeometry>
+    <PathGeometry x:Key="VolumeGeometry">M12 12c2.21 0 4-1.79 4-4v-4c0-2.21-1.79-4-4-4s-4 1.79-4 4v4c0 2.21 1.79 4 4 4zM4 12H2v8h16v-8zM4 4v16h16V4z</PathGeometry>
+    <PathGeometry x:Key="QueueGeometry">M12 2L15 5L21 8L24 12L21 16M12 22L15 19L21 16M2 12h20v2H2z</PathGeometry>
+    <PathGeometry x:Key="LyricsGeometry">M4 4h16v2H4zM4 10h16v2H4zM4 16h16v2H4zM4 22h16v2H4z</PathGeometry>
+    <PathGeometry x:Key="LyricsNoteGeometry">M8 7L16 7M8 11L12 11M8 19L16 19M8 23L12 23</PathGeometry>
+    <PathGeometry x:Key="ShuffleOnGeometry">M12 2v6h6v10h-6v-10zM12 22v-6h6v-10h-6zM2 12h20v2H2zM10 2L14 5L18 8</PathGeometry>
+    <PathGeometry x:Key="RepeatOnGeometry">M12 2v6h6v10h-6v-10zM12 22v-6h6v-10h-6zM2 12h20v2H2zM14 2L18 5L22 8</PathGeometry>
+    <PathGeometry x:Key="ShuffleOffGeometry">M12 2v6h6v10h-6v-10zM12 22v-6h6v-10h-6zM2 12h20v2H2zM10 2L14 5L18 8</PathGeometry>
+    <PathGeometry x:Key="RepeatOffGeometry">M12 2v6h6v10h-6v-10zM12 22v-6h6v-10h-6zM2 12h20v2H2zM14 2L18 5L22 8</PathGeometry>
+    <PathGeometry x:Key="NextLargeGeometry">M2 2L10 8L2 14ZM14 2L22 8L14 14Z</PathGeometry>
+    <PathGeometry x:Key="PlayPausePath">M8 5.5v13l10-6.5z</PathGeometry>
+    <PathGeometry x:Key="PlayPausePathLarge">M7 4v16l10-8zM17 4v16l-10-8z</PathGeometry>
   </Window.Resources>
 
   <NativeMenu.Menu>
@@ -264,7 +283,7 @@
                     Width="36" Height="36">
               <Path Width="16" Height="16" Stretch="Uniform"
                     Fill="{Binding IsShuffle, Converter={StaticResource BoolToBrushConverter}, ConverterParameter=Shuffle}"
-                    Data="M 2,2 L 8,2 L 8,8 L 2,8 Z M 10,10 L 16,10 L 16,16 L 10,16 Z M 2,10 L 8,10 L 8,16 L 2,16 Z M 10,2 L 16,2 L 16,8 L 10,8 Z M 5,5 L 11,11 M 11,5 L 5,11" />
+                    Data="{StaticResource ShuffleGeometry}" />
             </Button>
 
             <!-- Previous -->
@@ -273,7 +292,7 @@
                     ToolTip.Tip="Previous"
                     Width="38" Height="38">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{StaticResource TextPrimaryBrush}"
-                    Data="M 10,2 L 18,8 L 10,14 Z M 2,2 L 8,8 L 2,14 Z" />
+                    Data="{StaticResource PreviousGeometry}" />
             </Button>
 
             <!-- Play / Pause (Primary) -->
@@ -292,7 +311,7 @@
                     ToolTip.Tip="Next"
                     Width="38" Height="38">
               <Path Width="18" Height="18" Stretch="Uniform" Fill="{StaticResource TextPrimaryBrush}"
-                    Data="M 2,2 L 10,8 L 2,14 Z M 14,2 L 22,8 L 14,14 Z" />
+                    Data="{StaticResource NextGeometry}" />
             </Button>
 
             <!-- Repeat -->
@@ -369,7 +388,7 @@
                     Width="36" Height="36">
               <Path Width="18" Height="18" Stretch="Uniform"
                     Fill="{Binding IsLyricsVisible, Converter={StaticResource BoolToBrushConverter}}"
-                    Data="M 4,4 L 20,4 L 20,12 L 4,12 Z M 4,16 L 20,16 L 20,24 L 4,24 Z M 8,7 L 16,7 M 8,11 L 12,11 M 8,19 L 16,19 M 8,23 L 12,23" />
+                    Data="{StaticResource LyricsGeometry}" />
             </Button>
             <!-- Queue Drawer Toggle -->
             <Button Classes="icon"
@@ -379,7 +398,7 @@
                     Width="36" Height="36">
               <Path Width="18" Height="18" Stretch="Uniform"
                     Fill="{Binding IsQueueVisible, Converter={StaticResource BoolToBrushConverter}}"
-                    Data="M 3,3 L 12,3 L 12,10 L 3,10 Z M 15,3 L 24,3 L 24,10 L 15,10 Z M 3,13 L 12,13 L 12,20 L 3,20 Z M 15,13 L 24,13 L 24,20 L 15,20 Z" />
+                    Data="{StaticResource QueueGeometry}" />
             </Button>
           </StackPanel>
         </Grid>
