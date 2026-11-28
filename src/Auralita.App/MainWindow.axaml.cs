@@ -156,12 +156,11 @@ public partial class MainWindow : Window
         try
         {
             var settings = await _plexSettingsStore.LoadAsync(_windowCancellation.Token);
-            var token = _credentialStore.GetPlexToken();
             var clientIdentifier = await _plexSettingsStore.GetOrCreateClientIdentifierAsync(
                 _windowCancellation.Token);
             var dialog = new PlexConnectionDialog(
                 settings,
-                token,
+                null,
                 clientIdentifier,
                 _credentialStore);
             var result = await dialog.ShowDialog<PlexConnectionResult?>(this);

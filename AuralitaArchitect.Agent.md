@@ -227,3 +227,61 @@ If you detect that you are repeatedly attempting to read output, inspect files, 
 2. Do NOT write output logs to disk/temp files.
 3. Call `execute/getTerminalOutput` to inspect `stdout`/`stderr` from the active terminal session.
 4. If output is too large, run inline Python to filter stdout directly, rather than writing output to temporary files.
+
+---
+
+## 5. MACOS APP BUNDLE DIRECTIVES
+
+### 5.1 Always Build Auralita.app Bundle
+
+**MANDATORY:** After any code change that affects the macOS application, always rebuild the complete `.app` bundle using the packaging script. Never rely on `dotnet publish` output alone.
+
+```bash
+cd /Users/guillem/code/auralita && ./scripts/package-macos-app.sh
+```
+
+This script performs:
+1. `dotnet publish` for `osx-arm64` with NativeAOT and self-contained deployment
+2. Creates the `.app` bundle structure at `artifacts/Auralita.app`
+3. Copies executable and all native `.dylib` dependencies to `Contents/MacOS/`
+4. Generates the `.icns` icon from the iconset via `scripts/generate-macos-icon.swift`
+5. Copies `Info.plist` and creates `PkgInfo`
+6. Ad-hoc signs the bundle with `codesign --force --deep --sign -`
+
+**Verification:** After building, confirm:
+- `artifacts/Auralita.app/Contents/MacOS/Auralita.App` exists and is executable
+- `artifacts/Auralita.app/Contents/Resources/Auralita.icns` exists (171KB+)
+- `artifacts/Auralita.app/Contents/Info.plist` has correct `CFBundleName` and `CFBundleDisplayName`
+- `codesign -dv artifacts/Auralita.app` shows valid ad-hoc signature
+
+### 5.2 Icon Handling: Prevent Empty White Box in Finder
+
+The macOS icon cache often shows a white/empty box after rebuilding the app bundle. To ensure the icon appears correctly:
+
+**After every `package-macos-app.sh` run, execute:**
+
+```bash
+# Force Finder to refresh the icon cache
+touch /Users/guillem/code/auralita/artifacts/Auralita.app
+
+# If icon still shows as white box, clear system icon caches:
+sudo rm -rf /Library/Caches/com.apple.iconservices.store
+sudo rm -rf ~/Library/Caches/com.apple.iconservices.store
+killall Finder
+```
+
+**Icon requirements in `src/Auralita.App/Info.plist`:**
+```xml
+<key>CFBundleIconFile</key>
+<string>Auralita.icns</string>
+<key>CFBundleName</key>
+<string>Auralita Music Player</string>
+<key>CFBundleDisplayName</key>
+<string>Auralita Music Player</string>
+```
+
+**Icon generation:** The script `scripts/generate-macos-icon.swift` generates all 10 required sizes (16x16 through 1024x1024 @2x) into `artifacts/Auralita.iconset/`, then `iconutil -c icns` creates the final `.icns`. Verify with:
+```bash
+iconutil -c iconset artifacts/Auralita.app/Contents/Resources/Auralita.icns -o /tmp/verify.iconset && ls /tmp/verify.iconset/
+# Should show 10 PNG files
+```
