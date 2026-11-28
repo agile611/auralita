@@ -1,9 +1,16 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -40,12 +47,37 @@ public partial class MainWindow : Window
     private bool _isPlaying;
     private bool _isPaused;
     private bool _hasActiveTrack;
+    private MainWindowViewModel? _viewModel;
 
     public MainWindow()
     {
         InitializeComponent();
+        _viewModel = new MainWindowViewModel();
+        DataContext = _viewModel;
+
+        // Wire up ViewModel events
+        _viewModel.FilterChanged += OnFilterChanged;
+        _viewModel.VolumeChanged += OnVolumeChanged;
+        _viewModel.MuteChanged += OnMuteChanged;
+        _viewModel.ShuffleChanged += OnShuffleChanged;
+        _viewModel.RepeatModeChanged += OnRepeatModeChanged;
+        _viewModel.PlaySelectedRequested += OnPlaySelectedRequested;
+        _viewModel.PauseRequested += OnPauseRequested;
+        _viewModel.StopRequested += OnStopRequested;
+        _viewModel.PreviousRequested += OnPreviousRequested;
+        _viewModel.NextRequested += OnNextRequested;
+        _viewModel.AddFilesRequested += OnAddFilesRequested;
+        _viewModel.ConnectPlexRequested += OnConnectPlexRequested;
+        _viewModel.MoveUpRequested += OnMoveUpRequested;
+        _viewModel.MoveDownRequested += OnMoveDownRequested;
+        _viewModel.RemoveRequested += OnRemoveRequested;
+        _viewModel.SeekRequested += OnSeekRequested;
+        _viewModel.SidebarSectionChanged += OnSidebarSectionChanged;
+        _viewModel.SourceFilterChanged += OnSourceFilterChanged;
+        _viewModel.SelectionChanged += OnViewModelSelectionChanged;
+
         MacMediaSession.Enable(HandleMediaCommand, HandleMediaSeek);
-        QueueList.ItemsSource = _entries;
+        TrackList.ItemsSource = _entries;
         _playbackTimer.Interval = TimeSpan.FromMilliseconds(500);
         _playbackTimer.Tick += OnPlaybackTimerTick;
         Closed += OnWindowClosed;
@@ -65,6 +97,30 @@ public partial class MainWindow : Window
 
     private void OnMenuPlexClick(object? sender, EventArgs e) =>
         OnPlexClick(sender, new RoutedEventArgs());
+
+    private void OnToggleQueueClick(object? sender, EventArgs e) =>
+        _viewModel?.ToggleQueueCommand.Execute(null);
+
+    private void OnToggleLyricsClick(object? sender, EventArgs e) =>
+        _viewModel?.ToggleLyricsCommand.Execute(null);
+
+    private void OnCloseClick(object? sender, RoutedEventArgs e)
+    {
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown();
+        }
+    }
+
+    private void OnMinimizeClick(object? sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void OnZoomClick(object? sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
 
     private void HandleMediaCommand(int command)
     {
@@ -88,7 +144,6 @@ public partial class MainWindow : Window
                     {
                         OnPlayClick(this, args);
                     }
-
                     break;
                 case 3:
                     OnNextClick(this, args);
@@ -117,7 +172,7 @@ public partial class MainWindow : Window
             }
             catch (InvalidOperationException exception)
             {
-                StatusText.Text = $"Could not seek in this track: {exception.Message}";
+                _viewModel!.StatusText = $"Could not seek in this track: {exception.Message}";
             }
         });
     }
@@ -127,7 +182,7 @@ public partial class MainWindow : Window
         try
         {
             _plexSettings = await _plexSettingsStore.LoadAsync(_windowCancellation.Token);
-            StatusText.Text = _plexSettings is null
+            _viewModel!.StatusText = _plexSettings is null
                 ? "Open audio files or connect to Plex to add music."
                 : "Open audio files or connect to Plex to refresh your music library.";
         }
@@ -136,7 +191,7 @@ public partial class MainWindow : Window
             UnauthorizedAccessException or
             InvalidOperationException)
         {
-            StatusText.Text = $"Saved Plex settings unavailable: {exception.Message}";
+            _viewModel!.StatusText = $"Saved Plex settings unavailable: {exception.Message}";
         }
         catch (OperationCanceledException) when (_windowCancellation.IsCancellationRequested)
         {
@@ -175,13 +230,13 @@ public partial class MainWindow : Window
             _ = CreatePlexClient(result.Settings, result.Token, clientIdentifier);
             AddPlexTracks(result.Tracks);
             RefreshQueue();
-            StatusText.Text = result.Tracks.Count == 0
+            _viewModel!.StatusText = result.Tracks.Count == 0
                 ? "Connected Plex library is empty."
                 : $"Added {result.Tracks.Count} Plex track(s) to the queue.";
         }
         catch (PlexAuthenticationException exception)
         {
-            StatusText.Text = ClearPlexCredentials(exception);
+            _viewModel!.StatusText = ClearPlexCredentials(exception);
         }
         catch (Exception exception) when (
             exception is IOException or
@@ -191,7 +246,7 @@ public partial class MainWindow : Window
             DllNotFoundException or
             EntryPointNotFoundException)
         {
-            StatusText.Text = $"Could not connect to Plex: {exception.Message}";
+            _viewModel!.StatusText = $"Could not connect to Plex: {exception.Message}";
         }
         catch (OperationCanceledException) when (_windowCancellation.IsCancellationRequested)
         {
@@ -222,7 +277,7 @@ public partial class MainWindow : Window
                 var path = file.TryGetLocalPath();
                 if (path is null)
                 {
-                    StatusText.Text = "A selected item is not available as a local file.";
+                    _viewModel!.StatusText = "A selected item is not available as a local file.";
                     continue;
                 }
 
@@ -234,7 +289,7 @@ public partial class MainWindow : Window
             }
 
             RefreshQueue();
-            StatusText.Text = addedCount == 0
+            _viewModel!.StatusText = addedCount == 0
                 ? "No local audio files were added."
                 : $"Added {addedCount} file(s). Select a track and press Play.";
         }
@@ -244,7 +299,7 @@ public partial class MainWindow : Window
             InvalidOperationException or
             NotSupportedException)
         {
-            StatusText.Text = $"Could not add audio files: {exception.Message}";
+            _viewModel!.StatusText = $"Could not add audio files: {exception.Message}";
         }
     }
 
@@ -254,17 +309,27 @@ public partial class MainWindow : Window
     private void OnMoveDownClick(object? sender, RoutedEventArgs e) =>
         MoveSelected(1);
 
-    private void OnPreviousClick(object? sender, RoutedEventArgs e) =>
-        NavigatePlayback(-1);
+    private void OnPreviousClick(object? sender, RoutedEventArgs e)
+    {
+        if (_viewModel?.PreviousCommand.CanExecute(null) == true)
+        {
+            _viewModel.PreviousCommand.Execute(null);
+        }
+    }
 
-    private void OnNextClick(object? sender, RoutedEventArgs e) =>
-        NavigatePlayback(1);
+    private void OnNextClick(object? sender, RoutedEventArgs e)
+    {
+        if (_viewModel?.NextCommand.CanExecute(null) == true)
+        {
+            _viewModel.NextCommand.Execute(null);
+        }
+    }
 
     private void OnPlayClick(object? sender, RoutedEventArgs e)
     {
-        if (QueueList.SelectedItem is not QueueTrackViewModel selected)
+        if (_viewModel?.SelectedTrack is not QueueTrackViewModel selected)
         {
-            StatusText.Text = "Select a track to play.";
+            _viewModel!.StatusText = "Select a track to play.";
             return;
         }
 
@@ -288,85 +353,8 @@ public partial class MainWindow : Window
         }
 
         UpdateMediaSession(2);
-        StatusText.Text = "Playback paused.";
+        _viewModel!.StatusText = "Playback paused.";
         UpdatePlaybackControls();
-    }
-
-    private void PlayTrack(QueueEntry entry)
-    {
-        try
-        {
-            if (_isPaused && _activeEntryId == entry.Id)
-            {
-                _audioPlayer.Resume();
-                _streamStartTime = DateTimeOffset.UtcNow;
-            }
-            else
-            {
-                if (_hasActiveTrack &&
-                    _activeEntryId is { } previousEntryId &&
-                    previousEntryId != entry.Id)
-                {
-                    ReportPlexTimeline(previousEntryId, "stopped");
-                }
-
-                _audioPlayer.Play(entry.Track);
-                _activeEntryId = entry.Id;
-                _activeTrackIsRemote = entry.Track.Source?.Scheme is "http" or "https";
-                _streamStartTime = DateTimeOffset.UtcNow;
-            }
-
-            _isPlaying = true;
-            _isPaused = false;
-            _hasActiveTrack = true;
-            ReportPlexTimeline(entry.Id, "playing");
-            NowPlayingText.Text = entry.Track.Title;
-            NowPlayingDetailsText.Text = $"{entry.Track.Artist}  ·  {entry.Track.Album}";
-            NowPlayingArtwork.Source = _entryViewModels.GetValueOrDefault(entry.Id)?.Artwork;
-            if (_entryViewModels.TryGetValue(entry.Id, out var activeViewModel))
-            {
-                LoadArtwork(activeViewModel);
-            }
-
-            StatusText.Text = $"Playing {entry.Track.Title}.";
-            UpdateMediaSession(1);
-            UpdateMediaSessionArtwork();
-            _playbackTimer.Start();
-            UpdatePlaybackProgress();
-            UpdatePlaybackControls();
-        }
-        catch (Exception exception) when (
-            exception is IOException or
-            UnauthorizedAccessException or
-            InvalidOperationException or
-            NotSupportedException or
-            DllNotFoundException or
-            EntryPointNotFoundException)
-        {
-            StatusText.Text = $"Could not play {entry.Track.Title}: {exception.Message}";
-            UpdatePlaybackControls();
-        }
-    }
-
-    private void NavigatePlayback(int direction)
-    {
-        var moved = direction < 0
-            ? _queue.TrySelectPrevious()
-            : _queue.TrySelectNext();
-        if (!moved)
-        {
-            return;
-        }
-
-        if (_queue.Snapshot.CurrentEntryId is { } entryId)
-        {
-            SelectQueueEntry(entryId);
-        }
-
-        if (QueueList.SelectedItem is QueueTrackViewModel selected)
-        {
-            PlayTrack(selected.Entry);
-        }
     }
 
     private void OnStopClick(object? sender, RoutedEventArgs e)
@@ -385,23 +373,30 @@ public partial class MainWindow : Window
         _hasActiveTrack = false;
         _activeEntryId = null;
         _activeTrackIsRemote = false;
-        NowPlayingText.Text = "Nothing playing";
-        NowPlayingDetailsText.Text = string.Empty;
-        NowPlayingArtwork.Source = null;
-        StatusText.Text = "Playback stopped.";
+        _viewModel!.ActiveTrack = null;
+        _viewModel!.IsPlaying = false;
+        _viewModel!.IsPaused = false;
+        _viewModel!.HasActiveTrack = false;
+        _viewModel!.StatusText = "Playback stopped.";
         UpdatePlaybackProgress();
         UpdatePlaybackControls();
     }
 
     private void OnProgressPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (!_hasActiveTrack || ProgressTrack.Bounds.Width <= 0 || _audioPlayer.Duration <= TimeSpan.Zero)
+        if (!_hasActiveTrack || _audioPlayer.Duration <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        var progressTrack = this.FindControl<Grid>("ProgressTrack");
+        if (progressTrack == null || progressTrack.Bounds.Width <= 0)
         {
             return;
         }
 
         var fraction = Math.Clamp(
-            e.GetPosition(ProgressTrack).X / ProgressTrack.Bounds.Width,
+            e.GetPosition(progressTrack).X / progressTrack.Bounds.Width,
             0,
             1);
         try
@@ -412,13 +407,13 @@ public partial class MainWindow : Window
         }
         catch (InvalidOperationException exception)
         {
-            StatusText.Text = $"Could not seek in this track: {exception.Message}";
+            _viewModel!.StatusText = $"Could not seek in this track: {exception.Message}";
         }
     }
 
     private void OnRemoveClick(object? sender, RoutedEventArgs e)
     {
-        if (QueueList.SelectedItem is not QueueTrackViewModel selected ||
+        if (_viewModel?.SelectedTrack is not QueueTrackViewModel selected ||
             !_queue.TryRemove(selected.Entry.Id))
         {
             return;
@@ -430,12 +425,12 @@ public partial class MainWindow : Window
         }
 
         RefreshQueue();
-        StatusText.Text = $"{_entries.Count} file(s) in queue.";
+        _viewModel!.StatusText = $"{_entries.Count} file(s) in queue.";
     }
 
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (QueueList.SelectedItem is QueueTrackViewModel selected)
+        if (TrackList.SelectedItem is QueueTrackViewModel selected)
         {
             _queue.TrySelect(selected.Entry.Id);
             LoadArtwork(selected);
@@ -446,7 +441,7 @@ public partial class MainWindow : Window
 
     private void MoveSelected(int offset)
     {
-        if (QueueList.SelectedItem is not QueueTrackViewModel selected)
+        if (_viewModel?.SelectedTrack is not QueueTrackViewModel selected)
         {
             return;
         }
@@ -481,7 +476,8 @@ public partial class MainWindow : Window
         _entries.Clear();
         foreach (var entry in snapshot.Entries)
         {
-            if (!existing.TryGetValue(entry.Id, out var viewModel))
+            QueueTrackViewModel viewModel;
+            if (!existing.TryGetValue(entry.Id, out viewModel!))
             {
                 viewModel = new QueueTrackViewModel(entry);
             }
@@ -497,9 +493,9 @@ public partial class MainWindow : Window
             _entryViewModels.Remove(entryId);
         }
 
-        QueueList.SelectedItem = _entries
+        TrackList.SelectedItem = _entries
             .FirstOrDefault(entry => entry.Entry.Id == snapshot.CurrentEntryId);
-        if (QueueList.SelectedItem is QueueTrackViewModel selectedViewModel)
+        if (TrackList.SelectedItem is QueueTrackViewModel selectedViewModel)
         {
             LoadArtwork(selectedViewModel);
         }
@@ -511,14 +507,71 @@ public partial class MainWindow : Window
     private void SelectQueueEntry(Guid entryId)
     {
         _queue.TrySelect(entryId);
-        QueueList.SelectedItem = _entryViewModels.GetValueOrDefault(entryId);
-        if (QueueList.SelectedItem is QueueTrackViewModel selectedViewModel)
+        TrackList.SelectedItem = _entryViewModels.GetValueOrDefault(entryId);
+        if (TrackList.SelectedItem is QueueTrackViewModel selectedViewModel)
         {
             LoadArtwork(selectedViewModel);
         }
 
         UpdateQueueChrome();
         UpdatePlaybackControls();
+    }
+
+    private void PlayTrack(QueueEntry entry)
+    {
+        try
+        {
+            if (_isPaused && _activeEntryId == entry.Id)
+            {
+                _audioPlayer.Resume();
+                _streamStartTime = DateTimeOffset.UtcNow;
+            }
+            else
+            {
+                if (_hasActiveTrack &&
+                    _activeEntryId is { } previousEntryId &&
+                    previousEntryId != entry.Id)
+                {
+                    ReportPlexTimeline(previousEntryId, "stopped");
+                }
+
+                _audioPlayer.Play(entry.Track);
+                _activeEntryId = entry.Id;
+                _activeTrackIsRemote = entry.Track.Source?.Scheme is "http" or "https";
+                _streamStartTime = DateTimeOffset.UtcNow;
+            }
+
+            _isPlaying = true;
+            _isPaused = false;
+            _hasActiveTrack = true;
+            ReportPlexTimeline(entry.Id, "playing");
+            _viewModel!.ActiveTrack = _entryViewModels.GetValueOrDefault(entry.Id);
+            _viewModel!.IsPlaying = true;
+            _viewModel!.IsPaused = false;
+            _viewModel!.HasActiveTrack = true;
+            if (_entryViewModels.TryGetValue(entry.Id, out var activeViewModel))
+            {
+                LoadArtwork(activeViewModel);
+            }
+
+            _viewModel!.StatusText = $"Playing {entry.Track.Title}.";
+            UpdateMediaSession(1);
+            UpdateMediaSessionArtwork();
+            _playbackTimer.Start();
+            UpdatePlaybackProgress();
+            UpdatePlaybackControls();
+        }
+        catch (Exception exception) when (
+            exception is IOException or
+            UnauthorizedAccessException or
+            InvalidOperationException or
+            NotSupportedException or
+            DllNotFoundException or
+            EntryPointNotFoundException)
+        {
+            _viewModel!.StatusText = $"Could not play {entry.Track.Title}: {exception.Message}";
+            UpdatePlaybackControls();
+        }
     }
 
     private void OnPlaybackTimerTick(object? sender, EventArgs e)
@@ -548,7 +601,7 @@ public partial class MainWindow : Window
             _hasActiveTrack = false;
             _activeEntryId = null;
             _activeTrackIsRemote = false;
-            StatusText.Text = $"Playback failed: {exception.Message}";
+            _viewModel!.StatusText = $"Playback failed: {exception.Message}";
             UpdatePlaybackControls();
             return;
         }
@@ -560,7 +613,7 @@ public partial class MainWindow : Window
                 SelectQueueEntry(entryId);
             }
 
-            if (QueueList.SelectedItem is QueueTrackViewModel nextTrack)
+            if (TrackList.SelectedItem is QueueTrackViewModel nextTrack)
             {
                 PlayTrack(nextTrack.Entry);
                 return;
@@ -573,7 +626,7 @@ public partial class MainWindow : Window
         _hasActiveTrack = false;
         _activeEntryId = null;
         _activeTrackIsRemote = false;
-        StatusText.Text = "Playback finished.";
+        _viewModel!.StatusText = "Playback finished.";
         UpdatePlaybackProgress();
         UpdatePlaybackControls();
     }
@@ -592,9 +645,132 @@ public partial class MainWindow : Window
         _windowCancellation.Dispose();
     }
 
+    // ViewModel Event Handlers
+    private void OnFilterChanged(object? sender, EventArgs e)
+    {
+        // Filter logic would go here
+    }
+
+    private void OnVolumeChanged(object? sender, double volume)
+    {
+        // Volume control would be implemented in audio player
+    }
+
+    private void OnMuteChanged(object? sender, bool isMuted)
+    {
+        // Mute control would be implemented in audio player
+    }
+
+    private void OnShuffleChanged(object? sender, bool isShuffle)
+    {
+        // Shuffle mode would be implemented in queue
+    }
+
+    private void OnRepeatModeChanged(object? sender, RepeatMode repeatMode)
+    {
+        // Repeat mode would be implemented in queue
+    }
+
+    private void OnPlaySelectedRequested(object? sender, EventArgs e)
+    {
+        if (_viewModel?.SelectedTrack is QueueTrackViewModel selected)
+        {
+            PlayTrack(selected.Entry);
+        }
+    }
+
+    private void OnPauseRequested(object? sender, EventArgs e)
+    {
+        OnPauseClick(this, new RoutedEventArgs());
+    }
+
+    private void OnStopRequested(object? sender, EventArgs e)
+    {
+        OnStopClick(this, new RoutedEventArgs());
+    }
+
+    private void OnPreviousRequested(object? sender, EventArgs e)
+    {
+        OnPreviousClick(this, new RoutedEventArgs());
+    }
+
+    private void OnNextRequested(object? sender, EventArgs e)
+    {
+        OnNextClick(this, new RoutedEventArgs());
+    }
+
+    private void OnAddFilesRequested(object? sender, EventArgs e)
+    {
+        OnAddTracksClick(this, new RoutedEventArgs());
+    }
+
+    private void OnConnectPlexRequested(object? sender, EventArgs e)
+    {
+        OnPlexClick(this, new RoutedEventArgs());
+    }
+
+    private void OnMoveUpRequested(object? sender, EventArgs e)
+    {
+        MoveSelected(-1);
+    }
+
+    private void OnMoveDownRequested(object? sender, EventArgs e)
+    {
+        MoveSelected(1);
+    }
+
+    private void OnRemoveRequested(object? sender, EventArgs e)
+    {
+        OnRemoveClick(this, new RoutedEventArgs());
+    }
+
+    private void OnSeekRequested(object? sender, double fraction)
+    {
+        if (!_hasActiveTrack || _audioPlayer.Duration <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        try
+        {
+            _audioPlayer.Seek(TimeSpan.FromTicks((long)(_audioPlayer.Duration.Ticks * fraction)));
+            UpdatePlaybackProgress();
+        }
+        catch (InvalidOperationException exception)
+        {
+            _viewModel!.StatusText = $"Could not seek in this track: {exception.Message}";
+        }
+    }
+
+    private void OnSidebarSectionChanged(object? sender, SidebarSection section)
+    {
+        // Update section title
+        if (this.FindControl<TextBlock>("SectionTitle") is { } sectionTitle)
+        {
+            sectionTitle.Text = section switch
+            {
+                SidebarSection.Queue => "Queue",
+                SidebarSection.Tracks => "Tracks",
+                SidebarSection.Albums => "Albums",
+                SidebarSection.Artists => "Artists",
+                _ => "Queue"
+            };
+        }
+    }
+
+    private void OnSourceFilterChanged(object? sender, SourceFilter filter)
+    {
+        // Filter logic would go here
+    }
+
+    private void OnViewModelSelectionChanged(object? sender, EventArgs e)
+    {
+        UpdatePlaybackControls();
+    }
+
     private void UpdatePlaybackControls()
     {
-        var selectedViewModel = QueueList.SelectedItem as QueueTrackViewModel;
+        var selectedViewModel = TrackList.SelectedItem as QueueTrackViewModel;
         var selectedIndex = -1;
         var entries = _queue.Snapshot.Entries;
         for (var index = 0; index < entries.Count; index++)
@@ -606,14 +782,21 @@ public partial class MainWindow : Window
             }
         }
 
-        PlayButton.IsEnabled = selectedIndex >= 0;
-        PauseButton.IsEnabled = _isPlaying;
-        StopButton.IsEnabled = _hasActiveTrack;
-        PreviousButton.IsEnabled = selectedIndex > 0;
-        NextButton.IsEnabled = selectedIndex >= 0 && selectedIndex < entries.Count - 1;
-        MoveUpButton.IsEnabled = selectedIndex > 0;
-        MoveDownButton.IsEnabled = selectedIndex >= 0 && selectedIndex < entries.Count - 1;
-        RemoveButton.IsEnabled = selectedIndex >= 0;
+        _viewModel!.UpdateQueueCount(entries.Count);
+        _viewModel!.UpdateSelectedTrackCapabilities();
+
+        // Update command states
+        ((RelayCommand)_viewModel.PlaySelectedCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.PauseCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.StopCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.PreviousCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.NextCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.MoveUpCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.MoveDownCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.RemoveCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.ShuffleCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.RepeatCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)_viewModel.ToggleQueueCommand).RaiseCanExecuteChanged();
     }
 
     private void UpdatePlaybackProgress()
@@ -621,31 +804,24 @@ public partial class MainWindow : Window
         var duration = _audioPlayer.Duration;
         if (duration <= TimeSpan.Zero)
         {
-            ProgressFill.Width = 0;
-            ElapsedTimeText.Text = "00:00";
-            RemainingTimeText.Text = "--:--";
+            _viewModel!.ElapsedTime = TimeSpan.Zero;
+            _viewModel!.Duration = TimeSpan.Zero;
             return;
         }
 
         var position = _audioPlayer.CurrentTime;
-        var progress = Math.Clamp(position.TotalSeconds / duration.TotalSeconds, 0, 1);
-        ProgressFill.Width = ProgressTrack.Bounds.Width * progress;
-        ElapsedTimeText.Text = FormatTime(position);
-        RemainingTimeText.Text = $"-{FormatTime(duration - position)}";
-    }
-
-    private static string FormatTime(TimeSpan time)
-    {
-        var totalSeconds = Math.Max(0, (int)time.TotalSeconds);
-        return $"{totalSeconds / 60:00}:{totalSeconds % 60:00}";
+        _viewModel!.ElapsedTime = position;
+        _viewModel!.Duration = duration;
     }
 
     private void UpdateQueueChrome()
     {
-        EmptyQueuePanel.IsVisible = _entries.Count == 0;
-        QueueCountText.Text = _entries.Count == 1
-            ? "1 track"
-            : $"{_entries.Count} tracks";
+        if (this.FindControl<StackPanel>("EmptyStatePanel") is { } emptyPanel)
+        {
+            emptyPanel.IsVisible = _entries.Count == 0;
+        }
+        TrackList.IsVisible = _entries.Count > 0;
+        _viewModel!.UpdateQueueCount(_entries.Count);
     }
 
     private PlexClient CreatePlexClient(
@@ -700,7 +876,6 @@ public partial class MainWindow : Window
                 viewModel.Artwork = artwork;
                 if (_activeEntryId == viewModel.Entry.Id)
                 {
-                    NowPlayingArtwork.Source = artwork;
                     UpdateMediaSessionArtwork();
                 }
             });
@@ -714,12 +889,12 @@ public partial class MainWindow : Window
         catch (PlexAuthenticationException exception)
         {
             var message = ClearPlexCredentials(exception);
-            await Dispatcher.UIThread.InvokeAsync(() => StatusText.Text = message);
+            await Dispatcher.UIThread.InvokeAsync(() => _viewModel!.StatusText = message);
         }
         catch (PlexConnectionException exception)
         {
             await Dispatcher.UIThread.InvokeAsync(
-                () => StatusText.Text = $"Could not load Plex artwork: {exception.Message}");
+                () => _viewModel!.StatusText = $"Could not load Plex artwork: {exception.Message}");
         }
     }
 
@@ -794,7 +969,7 @@ public partial class MainWindow : Window
         catch (PlexAuthenticationException exception)
         {
             var message = ClearPlexCredentials(exception);
-            await Dispatcher.UIThread.InvokeAsync(() => StatusText.Text = message);
+            await Dispatcher.UIThread.InvokeAsync(() => _viewModel!.StatusText = message);
         }
         catch (PlexConnectionException)
         {
@@ -819,5 +994,4 @@ public partial class MainWindow : Window
             return $"{exception.Message} Could not clear the saved Plex sign-in: {deletionException.Message}";
         }
     }
-
 }

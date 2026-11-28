@@ -5,6 +5,7 @@
     RequestedThemeVariant="Dark">
   <Application.Resources>
     <ResourceDictionary>
+      <!-- Core Dark Theme Colors -->
       <SolidColorBrush x:Key="AppBackgroundBrush" Color="#17151B" />
       <SolidColorBrush x:Key="SurfaceBrush" Color="#211E26" />
       <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#2B2731" />
@@ -12,21 +13,65 @@
       <SolidColorBrush x:Key="BorderBrush" Color="#403A48" />
       <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F4F0F7" />
       <SolidColorBrush x:Key="TextSecondaryBrush" Color="#B8AFBF" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8A8494" />
       <SolidColorBrush x:Key="AccentBrush" Color="#B49ADA" />
       <SolidColorBrush x:Key="AccentHoverBrush" Color="#C8B3E8" />
       <SolidColorBrush x:Key="AccentForegroundBrush" Color="#211A2B" />
       <SolidColorBrush x:Key="AccentSoftBrush" Color="#3B3148" />
       <SolidColorBrush x:Key="PlayerTrackBrush" Color="#393440" />
       <SolidColorBrush x:Key="CoralBrush" Color="#E9A08B" />
+
+      <!-- Liquid Glass / Acrylic Colors -->
+      <SolidColorBrush x:Key="GlassBackgroundBrush" Color="#1E1926CC" />
+      <SolidColorBrush x:Key="GlassBackgroundHoverBrush" Color="#2A233699" />
+      <SolidColorBrush x:Key="GlassBorderBrush" Color="#33FFFFFF" />
+      <SolidColorBrush x:Key="GlassBorderStrongBrush" Color="#4DFFFFFF" />
+      <SolidColorBrush x:Key="GlassSpecularBrush" Color="#1AFFFFFF" />
+      <SolidColorBrush x:Key="GlassShadowBrush" Color="#33000000" />
+
+      <!-- Sidebar Colors -->
+      <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#1A171FCC" />
+      <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#2D2638" />
+      <SolidColorBrush x:Key="SidebarItemActiveBrush" Color="#3D334D" />
+      <SolidColorBrush x:Key="SidebarBorderBrush" Color="#2A2438" />
+
+      <!-- Transport Bar Colors -->
+      <SolidColorBrush x:Key="TransportBackgroundBrush" Color="#1E1926E6" />
+      <SolidColorBrush x:Key="TransportBorderBrush" Color="#33FFFFFF" />
+      <SolidColorBrush x:Key="LCDBackgroundBrush" Color="#1A161FCC" />
+      <SolidColorBrush x:Key="LCDBorderBrush" Color="#26FFFFFF" />
+
+      <!-- Now Playing Card -->
+      <SolidColorBrush x:Key="NowPlayingCardBrush" Color="#1E1926" />
+      <SolidColorBrush x:Key="NowPlayingCardBorderBrush" Color="#2A2438" />
+
+      <!-- Ambient Glow (set dynamically from artwork) -->
+      <SolidColorBrush x:Key="AmbientPrimaryBrush" Color="#3D2B5A" />
+      <SolidColorBrush x:Key="AmbientSecondaryBrush" Color="#2A1F42" />
+
+      <!-- Status Colors -->
+      <SolidColorBrush x:Key="SuccessBrush" Color="#4ADE80" />
+      <SolidColorBrush x:Key="WarningBrush" Color="#FBBF24" />
+      <SolidColorBrush x:Key="ErrorBrush" Color="#F87171" />
+
+      <!-- Corner Radius Resources -->
+      <CornerRadius x:Key="RadiusSmall">6</CornerRadius>
+      <CornerRadius x:Key="RadiusMedium">10</CornerRadius>
+      <CornerRadius x:Key="RadiusLarge">14</CornerRadius>
+      <CornerRadius x:Key="RadiusPill">999</CornerRadius>
+      <CornerRadius x:Key="RadiusCard">12</CornerRadius>
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
+    <!-- Base Window Style -->
     <Style Selector="Window">
       <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
       <Setter Property="FontFamily" Value="Avenir Next" />
       <Setter Property="FontSize" Value="13" />
     </Style>
+
+    <!-- TextBlock Styles -->
     <Style Selector="TextBlock">
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
     </Style>
@@ -46,13 +91,42 @@
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
     </Style>
-    <Style Selector="TextBox">
-      <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
-      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{StaticResource TextTertiaryBrush}" />
+    </Style>
+
+    <!-- Glass Panel Style (for sidebar, transport bar, cards) -->
+    <Style Selector="Border.glass">
+      <Setter Property="Background" Value="{StaticResource GlassBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
-      <Setter Property="SelectionBrush" Value="{StaticResource AccentSoftBrush}" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusLarge}" />
+      <Setter Property="BoxShadow" Value="0 4 24 -8 {StaticResource GlassShadowBrush}" />
+    </Style>
+    <Style Selector="Border.glass-thin">
+      <Setter Property="Background" Value="{StaticResource GlassBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="CornerRadius" Value="0" />
+    </Style>
+
+    <!-- Sidebar Styles -->
+    <Style Selector="Border.sidebar">
+      <Setter Property="Background" Value="{StaticResource SidebarBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource SidebarBorderBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,1,0" />
+    </Style>
+    <Style Selector="Button.sidebar-item">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="14,10" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusMedium}" />
+      <Setter Property="Margin" Value="8,2" />
       <Setter Property="Template">
         <ControlTemplate>
           <Border
@@ -60,7 +134,50 @@
               Background="{TemplateBinding Background}"
               BorderBrush="{TemplateBinding BorderBrush}"
               BorderThickness="{TemplateBinding BorderThickness}"
-              CornerRadius="8">
+              CornerRadius="{TemplateBinding CornerRadius}">
+            <ContentPresenter
+                Name="PART_ContentPresenter"
+                Content="{TemplateBinding Content}"
+                ContentTemplate="{TemplateBinding ContentTemplate}"
+                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                Padding="{TemplateBinding Padding}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.sidebar-item:pointerover /template/ Border#PART_Border">
+      <Setter Property="Background" Value="{StaticResource SidebarItemHoverBrush}" />
+    </Style>
+    <Style Selector="Button.sidebar-item:pressed /template/ Border#PART_Border">
+      <Setter Property="Background" Value="{StaticResource SidebarItemActiveBrush}" />
+    </Style>
+    <Style Selector="Button.sidebar-item.active /template/ Border#PART_Border">
+      <Setter Property="Background" Value="{StaticResource SidebarItemActiveBrush}" />
+    </Style>
+    <Style Selector="Button.sidebar-item.active">
+      <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- TextBox Styles -->
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
+      <Setter Property="SelectionBrush" Value="{StaticResource AccentSoftBrush}" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusMedium}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border
+              Name="PART_Border"
+              Background="{TemplateBinding Background}"
+              BorderBrush="{TemplateBinding BorderBrush}"
+              BorderThickness="{TemplateBinding BorderThickness}"
+              CornerRadius="{TemplateBinding CornerRadius}">
             <ScrollViewer
                 Name="PART_ScrollViewer"
                 Background="Transparent"
@@ -81,6 +198,12 @@
     <Style Selector="TextBox:focus /template/ Border#PART_Border">
       <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
     </Style>
+    <Style Selector="TextBox.glass">
+      <Setter Property="Background" Value="{StaticResource GlassBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+    </Style>
+
+    <!-- Button Styles -->
     <Style Selector="Button">
       <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
@@ -88,6 +211,7 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Padding" Value="14,9" />
       <Setter Property="MinHeight" Value="38" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusMedium}" />
       <Setter Property="Template">
         <ControlTemplate>
           <Border
@@ -95,7 +219,7 @@
               Background="{TemplateBinding Background}"
               BorderBrush="{TemplateBinding BorderBrush}"
               BorderThickness="{TemplateBinding BorderThickness}"
-              CornerRadius="9">
+              CornerRadius="{TemplateBinding CornerRadius}">
             <ContentPresenter
                 Name="PART_ContentPresenter"
                 Content="{TemplateBinding Content}"
@@ -120,6 +244,7 @@
     <Style Selector="Button:disabled">
       <Setter Property="Opacity" Value="0.45" />
     </Style>
+
     <Style Selector="Button.accent">
       <Setter Property="Background" Value="{StaticResource AccentBrush}" />
       <Setter Property="Foreground" Value="{StaticResource AccentForegroundBrush}" />
@@ -130,6 +255,7 @@
       <Setter Property="Background" Value="{StaticResource AccentHoverBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource AccentHoverBrush}" />
     </Style>
+
     <Style Selector="Button.quiet">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="Transparent" />
@@ -139,17 +265,80 @@
       <Setter Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
     </Style>
+
+    <Style Selector="Button.glass">
+      <Setter Property="Background" Value="{StaticResource GlassBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GlassBorderBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.glass:pointerover /template/ Border#PART_Border">
+      <Setter Property="Background" Value="{StaticResource GlassBackgroundHoverBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource GlassBorderStrongBrush}" />
+    </Style>
+
+    <!-- Icon Button (circular) -->
+    <Style Selector="Button.icon">
+      <Setter Property="MinWidth" Value="36" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="8" />
+      <Setter Property="CornerRadius" Value="18" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.icon:pointerover /template/ Border#PART_Border">
+      <Setter Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
+    </Style>
+    <Style Selector="Button.icon:pressed /template/ Border#PART_Border">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+    </Style>
+
+    <!-- Transport Bar Buttons -->
     <Style Selector="Button.transport">
       <Setter Property="MinWidth" Value="44" />
       <Setter Property="MinHeight" Value="44" />
       <Setter Property="Padding" Value="12" />
-      <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+      <Setter Property="CornerRadius" Value="22" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.transport:pointerover /template/ Border#PART_Border">
+      <Setter Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
+    </Style>
+    <Style Selector="Button.transport:pressed /template/ Border#PART_Border">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
     </Style>
     <Style Selector="Button.transport-play">
       <Setter Property="Background" Value="{StaticResource CoralBrush}" />
       <Setter Property="Foreground" Value="{StaticResource AccentForegroundBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource CoralBrush}" />
+      <Setter Property="MinWidth" Value="56" />
+      <Setter Property="MinHeight" Value="56" />
+      <Setter Property="CornerRadius" Value="28" />
     </Style>
+    <Style Selector="Button.transport-play:pointerover /template/ Border#PART_Border">
+      <Setter Property="Background" Value="#F0B098" />
+      <Setter Property="BorderBrush" Value="#F0B098" />
+    </Style>
+
+    <!-- LCD Now Playing Pill -->
+    <Style Selector="Border.lcd-pill">
+      <Setter Property="Background" Value="{StaticResource LCDBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource LCDBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusMedium}" />
+      <Setter Property="Padding" Value="12,6,16,6" />
+    </Style>
+
+    <!-- Now Playing Card -->
+    <Style Selector="Border.nowplaying-card">
+      <Setter Property="Background" Value="{StaticResource NowPlayingCardBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource NowPlayingCardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusCard}" />
+      <Setter Property="BoxShadow" Value="0 8 32 -12 {StaticResource GlassShadowBrush}" />
+    </Style>
+
+    <!-- ScrollViewer -->
     <Style Selector="ScrollViewer">
       <Setter Property="Template">
         <ControlTemplate>
@@ -162,6 +351,8 @@
         </ControlTemplate>
       </Setter>
     </Style>
+
+    <!-- ListBox -->
     <Style Selector="ListBox">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
@@ -183,10 +374,11 @@
         </ControlTemplate>
       </Setter>
     </Style>
+
     <Style Selector="ListBoxItem">
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Padding" Value="4,2" />
+      <Setter Property="Padding" Value="8,4" />
       <Setter Property="Template">
         <ControlTemplate>
           <Border
@@ -215,6 +407,45 @@
     </Style>
     <Style Selector="ListBoxItem:selected:pointerover">
       <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+    </Style>
+
+    <!-- Slider (Volume) -->
+    <Style Selector="Slider">
+      <Setter Property="MinWidth" Value="100" />
+      <Setter Property="Height" Value="24" />
+    </Style>
+    <Style Selector="Slider /template/ Thumb">
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+      <Setter Property="CornerRadius" Value="7" />
+    </Style>
+
+    <!-- Separator -->
+    <Style Selector="Separator">
+      <Setter Property="Background" Value="{StaticResource BorderBrush}" />
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+
+    <!-- Badge/Pill -->
+    <Style Selector="Border.badge">
+      <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+      <Setter Property="CornerRadius" Value="{StaticResource RadiusPill}" />
+      <Setter Property="Padding" Value="8,3" />
+    </Style>
+    <Style Selector="Border.badge.success">
+      <Setter Property="Background" Value="#1A5C2E" />
+    </Style>
+    <Style Selector="Border.badge.warning">
+      <Setter Property="Background" Value="#5C4A1A" />
+    </Style>
+    <Style Selector="Border.badge.error">
+      <Setter Property="Background" Value="#5C1A1A" />
+    </Style>
+
+    <!-- Expander for Lyrics/Queue sections -->
+    <Style Selector="Expander">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
     </Style>
   </Application.Styles>
 </Application>
